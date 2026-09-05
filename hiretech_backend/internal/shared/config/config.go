@@ -196,9 +196,16 @@ type SecurityConfig struct {
 type KafkaConfig struct {
 	Brokers           []string
 	GroupID           string
+	InstanceID        string
 	Enabled           bool
 	NumPartitions     int
 	ReplicationFactor int
+}
+
+// ConsumerGroupID gives each realtime API instance its own Kafka consumer
+// group so every instance receives lifecycle events for its local sockets.
+func (k KafkaConfig) ConsumerGroupID() string {
+	return strings.TrimSpace(k.GroupID) + "-" + strings.TrimSpace(k.InstanceID)
 }
 
 // LogConfig holds logging settings.
@@ -249,6 +256,10 @@ func (c AIConfig) ValidateForProduction() error {
 
 // Load reads configuration from environment variables with sensible defaults.
 func Load() *Config {
+	hostname, err := os.Hostname()
+	if err != nil || strings.TrimSpace(hostname) == "" {
+		hostname = "local"
+	}
 	return &Config{
 		Environment: envOrDefault("APP_ENV", EnvironmentDevelopment),
 		Server: ServerConfig{
@@ -311,6 +322,7 @@ func Load() *Config {
 		Kafka: KafkaConfig{
 			Brokers:           envOrDefaultSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
 			GroupID:           envOrDefault("KAFKA_GROUP_ID", "masterfabric-go"),
+			InstanceID:        envOrDefault("KAFKA_INSTANCE_ID", hostname),
 			Enabled:           envOrDefault("KAFKA_ENABLED", "false") == "true",
 			NumPartitions:     envOrDefaultInt("KAFKA_NUM_PARTITIONS", 3),
 			ReplicationFactor: envOrDefaultInt("KAFKA_REPLICATION_FACTOR", 1),

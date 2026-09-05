@@ -374,6 +374,7 @@ All configuration is via environment variables with sensible defaults:
 | `KAFKA_ENABLED` | `false` | Enable Kafka event bus |
 | `KAFKA_BROKERS` | `localhost:9092` | Kafka broker addresses (comma-separated) |
 | `KAFKA_GROUP_ID` | `masterfabric-go` | Kafka consumer group ID |
+| `KAFKA_INSTANCE_ID` | host name | Stable unique API instance suffix; gives every realtime replica its own consumer group |
 | `KAFKA_NUM_PARTITIONS` | `3` | Default partitions for auto-created topics |
 | `KAFKA_REPLICATION_FACTOR` | `1` | Replication factor for auto-created topics |
 | `KAFKA_HOST_BIND` | `127.0.0.1` | Docker Compose host bind for Kafka (dev only) |

@@ -146,7 +146,7 @@ The mappings below show which existing use cases may be reused. They do not auth
 Verified PostgreSQL lifecycle and Redis rate-limit integration gate
   -> audit relay alerting/retention and complete admin audit lifecycle
   -> real interviewer/evaluator model artifacts and quality/latency evidence
-  -> durable subscription replay/cursor and cross-instance fan-out
+  -> durable subscription replay/cursor (live cross-instance Kafka fan-out is implemented)
   -> owner-authorized sandbox deployment, key-ring verification, and isolated interoperability test
   -> deletion, retention, export, and legal-hold verification
   -> frontend E2E and authorized release packaging

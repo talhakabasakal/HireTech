@@ -17,3 +17,7 @@ type Changed struct {
 	Version        int       `json:"version,omitempty"`
 	Timestamp      time.Time `json:"timestamp"`
 }
+
+// EnvelopeType is explicit because the generic struct-name fallback would emit
+// "changed", which is not the versioned interview lifecycle topic contract.
+func (Changed) EnvelopeType() string { return "interview.changed" }

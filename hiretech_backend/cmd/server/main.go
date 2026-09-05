@@ -127,7 +127,10 @@ func run() error {
 	}
 
 	// Initialize event bus (Kafka or in-process)
-	eventBus := initEventBus(ctx, cfg, log)
+	eventBus, err := initEventBus(ctx, cfg, log)
+	if err != nil {
+		return err
+	}
 	defer func() { _ = eventBus.Close() }()
 
 	// Build dependencies
@@ -137,6 +140,11 @@ func run() error {
 	}
 	serviceCtx, serviceCancel := context.WithCancel(context.Background())
 	defer serviceCancel()
+	// Kafka subscriptions are registered while dependencies are built. Start
+	// consuming only after every local realtime handler is attached.
+	if kafkaBus, ok := eventBus.(*infraKafka.Bus); ok {
+		kafkaBus.Start(serviceCtx)
+	}
 	if outboxRepo, ok := deps.AuditRepo.(auditUC.OutboxRepository); ok && cfg.Audit.RelayEnabled {
 		relay := auditUC.NewOutboxRelayWithConfig(outboxRepo, log, auditUC.OutboxRelayConfig{
 			BatchSize: cfg.Audit.RelayBatchSize, Interval: cfg.Audit.RelayInterval,
@@ -189,15 +197,15 @@ func run() error {
 }
 
 // initEventBus creates either a Kafka bus or an in-process bus based on config.
-func initEventBus(ctx context.Context, cfg *config.Config, log *slog.Logger) events.EventBus {
+func initEventBus(ctx context.Context, cfg *config.Config, log *slog.Logger) (events.EventBus, error) {
 	if !cfg.Kafka.Enabled {
 		log.Info("using in-process event bus (set KAFKA_ENABLED=true to use Kafka)")
-		return events.NewInProcessBus(log, 256)
+		return events.NewInProcessBus(log, 256), nil
 	}
 
 	log.Info("initializing kafka event bus",
 		"brokers", cfg.Kafka.Brokers,
-		"group_id", cfg.Kafka.GroupID,
+		"group_id", cfg.Kafka.ConsumerGroupID(),
 	)
 
 	// Ensure topics exist
@@ -210,19 +218,17 @@ func initEventBus(ctx context.Context, cfg *config.Config, log *slog.Logger) eve
 			cfg.Kafka.ReplicationFactor,
 			log,
 		); err != nil {
+			if cfg.IsProduction() {
+				return nil, fmt.Errorf("kafka is required when enabled in production: %w", err)
+			}
 			log.Warn("failed to ensure kafka topics, falling back to in-process bus", "error", err)
-			return events.NewInProcessBus(log, 256)
+			return events.NewInProcessBus(log, 256), nil
 		}
 	}
 
-	kafkaBus := infraKafka.NewBus(cfg.Kafka.Brokers, cfg.Kafka.GroupID, log)
-
-	// Start consuming (after subscriptions are registered in buildDependencies)
-	// We start consumption with a background context so it outlives the startup ctx.
-	kafkaBus.Start(context.Background())
-
-	log.Info("kafka event bus initialized")
-	return kafkaBus
+	kafkaBus := infraKafka.NewBus(cfg.Kafka.Brokers, cfg.Kafka.ConsumerGroupID(), log)
+	log.Info("kafka event bus initialized; consumer start deferred until handlers register")
+	return kafkaBus, nil
 }
 
 func buildDependencies(

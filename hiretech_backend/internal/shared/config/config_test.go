@@ -24,6 +24,12 @@ func TestLoad_Defaults(t *testing.T) {
 	assert.Equal(t, "json", cfg.Log.Format)
 }
 
+func TestKafkaConfig_ConsumerGroupIDIsInstanceScoped(t *testing.T) {
+	cfg := KafkaConfig{GroupID: "hiretech", InstanceID: "api-2"}
+
+	assert.Equal(t, "hiretech-api-2", cfg.ConsumerGroupID())
+}
+
 func TestLoad_PublicKeyRingEnvironment(t *testing.T) {
 	t.Setenv("JWT_PUBLIC_KEYS", `{"active":"public-key-pem"}`)
 

@@ -129,6 +129,7 @@ Required validation commands:
 - `go test ./...`
 - `go test -race ./...`
 - `make test-integration INTERVIEW_TEST_DSN=postgres://... REDIS_TEST_ADDR=127.0.0.1:6379` (requires isolated, reachable PostgreSQL and Redis services; fails when either target is absent)
+- `make test-integration-kafka KAFKA_TEST_BROKER=127.0.0.1:9092` (verifies that two instance-scoped consumer groups receive the same lifecycle event)
 
 ## Known limitations and production prerequisites
 
@@ -145,9 +146,12 @@ Required validation commands:
   operations decisions. Retention and integrity verification remain hardening
   work.
 - `interviewUpdated` is implemented for lifecycle notifications. A durable
-  reconnect cursor, cross-instance subscription fan-out, evaluation-specific
-  streams, and a separately operated high-volume subscription worker remain
-  future work. Persisted-operation hash allowlisting is implemented behind
+  reconnect cursor and evaluation-specific streams remain future work. When
+  Kafka is enabled, consumers now start only after subscription handlers are
+  registered and use an instance-scoped group, so every API replica receives
+  lifecycle events for its own sockets. Production fails closed instead of
+  silently degrading to an in-process bus when enabled Kafka is unavailable.
+  Persisted-operation hash allowlisting is implemented behind
   `GRAPHQL_REQUIRE_PERSISTED_OPERATIONS`. The frontend now versions a
   deterministic 27-operation manifest and checks it during production builds;
   its release command renders `GRAPHQL_ALLOWED_OPERATION_HASHES` without manual

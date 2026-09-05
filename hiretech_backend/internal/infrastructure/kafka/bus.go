@@ -77,6 +77,11 @@ func deriveEventType(event events.Event) string {
 	if env, ok := event.(*events.Envelope); ok {
 		return env.Type
 	}
+	if typed, ok := event.(interface{ EnvelopeType() string }); ok {
+		if eventType := strings.TrimSpace(typed.EnvelopeType()); eventType != "" {
+			return eventType
+		}
+	}
 
 	// Use reflection to get the struct name and convert to dot-notation.
 	// e.g. "UserRegistered" -> "user.registered"

@@ -47,7 +47,7 @@ The schema remains source-controlled at `graph/schema.graphqls`; gqlgen transpor
 
 ## Authorization behavior
 
-- Organization identity comes only from verified JWT claims; GraphQL continues to reject tenant-selection headers.
+- Organization identity comes only from verified JWT claims; GraphQL and the existing WebSocket endpoint reject tenant-selection headers that are missing or conflicting with the token.
 - Tenant operations require their corresponding `interview:*`, `question:*`, or `answer:*` permission.
 - Candidate operations require the `candidate-interview` token class and matching signed `interview_id`.
 - AI administration requires a tenant token; configuration reads require

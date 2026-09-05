@@ -13,6 +13,7 @@ import (
 	"github.com/masterfabric-go/masterfabric/internal/domain/realtime/model"
 	realtimeService "github.com/masterfabric-go/masterfabric/internal/domain/realtime/service"
 	infraWS "github.com/masterfabric-go/masterfabric/internal/infrastructure/websocket"
+	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
 	"github.com/masterfabric-go/masterfabric/internal/shared/middleware"
 	"github.com/masterfabric-go/masterfabric/internal/shared/response"
 )
@@ -71,7 +72,11 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orgID := resolveOrgID(r, claims.OrganizationID)
+	orgID, err := resolveOrgID(r, claims.OrganizationID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
 	appIDStr := r.Header.Get("X-App-ID")
 	appID, err := realtimeUC.ParseAppHeader(appIDStr)
 	if err != nil {
@@ -173,17 +178,18 @@ func (h *Handler) sendError(clientID, message string) {
 	h.sendControl(clientID, model.TypeError, "", message)
 }
 
-func resolveOrgID(r *http.Request, claimOrgID uuid.UUID) uuid.UUID {
+func resolveOrgID(r *http.Request, claimOrgID uuid.UUID) (uuid.UUID, error) {
+	if claimOrgID == uuid.Nil {
+		return uuid.Nil, domainErr.New(domainErr.ErrForbidden, "tenant token required", nil)
+	}
 	if header := r.Header.Get("X-Organization-ID"); header != "" {
-		if parsed, err := uuid.Parse(header); err == nil {
-			return parsed
+		parsed, err := uuid.Parse(header)
+		if err != nil {
+			return uuid.Nil, domainErr.New(domainErr.ErrBadRequest, "invalid X-Organization-ID", err)
+		}
+		if parsed != claimOrgID {
+			return uuid.Nil, domainErr.New(domainErr.ErrForbidden, "organization header does not match token", nil)
 		}
 	}
-	if claimOrgID != uuid.Nil {
-		return claimOrgID
-	}
-	if tenantOrg, ok := middleware.TenantIDFromContext(r.Context()); ok {
-		return tenantOrg
-	}
-	return uuid.Nil
+	return claimOrgID, nil
 }

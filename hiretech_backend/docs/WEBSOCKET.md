@@ -33,13 +33,14 @@ GET /api/v1/ws?token=<jwt>
 
 | Header | Description |
 | ------ | ----------- |
-| `X-Organization-ID` | Organization UUID (must match app ownership) |
+| `X-Organization-ID` | Optional compatibility header; when present it must exactly match the organization claim in the tenant JWT |
 | `X-App-ID` | Application UUID |
 
-**Auth resolution order:**
+**Auth resolution:**
 
-1. Query parameter `token`
-2. `Authorization: Bearer <jwt>`
+1. Query parameter `token` or `Authorization: Bearer <jwt>` supplies the token.
+2. Organization scope comes only from the verified JWT organization claim.
+3. A missing tenant claim is rejected; a conflicting organization header is rejected.
 
 **RBAC:** requires `app:read` permission (connecting to an app's event stream).
 

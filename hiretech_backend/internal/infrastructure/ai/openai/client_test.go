@@ -75,3 +75,30 @@ func TestClientRejectsInvalidRoleAndLanguage(t *testing.T) {
 		}
 	}
 }
+
+func TestCompletionEndpointRequiresSecureRemoteTransport(t *testing.T) {
+	for _, testCase := range []struct {
+		name string
+		url  string
+	}{
+		{name: "remote HTTP", url: "http://provider.example/v1"},
+		{name: "embedded credentials", url: "https://user:password@provider.example/v1"},
+		{name: "unsupported scheme", url: "ftp://provider.example/v1"},
+		{name: "fragment", url: "https://provider.example/v1#chat"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, err := NewClient(nil, testCase.url, "", "model", "v1")
+			if err == nil {
+				t.Fatal("expected invalid AI endpoint")
+			}
+		})
+	}
+}
+
+func TestCompletionEndpointAllowsLoopbackHTTPForDevelopment(t *testing.T) {
+	client, err := NewClient(nil, "http://127.0.0.1:8001/v1", "", "model", "v1")
+
+	if err != nil || client == nil {
+		t.Fatalf("expected loopback HTTP endpoint to be allowed, got client=%v err=%v", client, err)
+	}
+}

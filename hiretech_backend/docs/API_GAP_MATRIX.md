@@ -91,9 +91,9 @@ The mappings below show which existing use cases may be reused. They do not auth
 | Code execution | None | Isolated runner, resource limits, language images, result signing | `TestEvidence` initially read-only | Separate sandbox service/adapter; later phase |
 | Evaluation | Evaluation job/report persistence and deterministic baseline | Provider-backed scoring, richer rubric administration, benchmark lifecycle | `evaluationReport`, `requestEvaluation` | AI contracts, interview evidence |
 | Human review | Review record, requester separation, publication gate | Queue/assignment UI and operational workflows | `recordHumanReview` and report fields | Evaluation, admin RBAC, audit |
-| LLM registry | None | Provider/model metadata, capability, residency, status, secret references | `ModelConfiguration` inside admin config | Secret manager, admin approval |
+| LLM registry | Tenant-scoped model metadata, role capability, status, and immutable configuration versions | Provider/model metadata, residency, secret references | `ModelConfiguration` inside admin config | Secret manager, admin approval |
 | Prompts and rubrics | Documentation only | Versioned immutable assets, draft/approve/activate/rollback | `LLMConfiguration` fields and mutations | Registry, benchmark runner, audit |
-| LLM router | None | Classification, policy constraints, fallback, budget, health, logging | Internal only; client cannot choose model | Registry, adapters, metrics |
+| LLM router | Tenant-approved primary/fallback routing with bounded timeout and provider resolution | Classification, policy constraints, fallback, budget, health, logging | Internal only; client cannot choose model | Registry, adapters, metrics |
 | Account deletion | Repository delete methods only | Re-auth proof, job, resource manifest, multi-store erasure, report | Request/confirm/cancel mutations | OTP, sessions, retention policy, audit |
 | Compliance | Organization retention JSON only | Data inventory, purpose/lawful basis, retention enforcement, DSAR workflow | Mostly internal/admin | Legal policy approval and security controls |
 

@@ -119,8 +119,14 @@ func (c *Client) Complete(ctx context.Context, request aiModel.CompletionRequest
 
 func completionEndpoint(baseURL string) (string, error) {
 	parsed, err := url.Parse(strings.TrimSpace(baseURL))
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return "", fmt.Errorf("invalid AI endpoint")
+	}
+	if parsed.User != nil || parsed.Fragment != "" {
+		return "", fmt.Errorf("AI endpoint must not contain credentials or a fragment")
+	}
+	if parsed.Scheme != "https" && !isLoopbackHost(parsed.Hostname()) {
+		return "", fmt.Errorf("remote AI endpoint must use HTTPS")
 	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	if !strings.HasSuffix(parsed.Path, "/chat/completions") {
@@ -130,6 +136,15 @@ func completionEndpoint(baseURL string) (string, error) {
 		parsed.Path += "/chat/completions"
 	}
 	return parsed.String(), nil
+}
+
+func isLoopbackHost(host string) bool {
+	switch strings.ToLower(strings.TrimSpace(host)) {
+	case "localhost", "127.0.0.1", "[::1]", "::1":
+		return true
+	default:
+		return false
+	}
 }
 
 type chatRequest struct {

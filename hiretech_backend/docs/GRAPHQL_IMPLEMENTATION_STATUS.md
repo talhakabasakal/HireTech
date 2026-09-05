@@ -126,3 +126,8 @@ Required validation commands:
 ## Model-serving prerequisite and next phase
 
 The backend contains a provider-independent, bounded OpenAI-compatible gateway and environment-driven interviewer/evaluator model configuration. The interviewer gateway is wired to the AI question-draft workflow, while evaluation uses the configured evaluator when available and retains a deterministic fallback. Production rejects `smoketest` model versions when AI is enabled. Fine-tuned artifact loading and live Turkish/English model quality/latency tests remain prerequisites for enabling AI in production; artifacts can replace the configured model ID and version without changing the draft API contract.
+
+Provider endpoints are validated before use: loopback HTTP is allowed only for
+local development, remote endpoints must use HTTPS, and endpoint URLs cannot
+contain embedded credentials or fragments. Provider API keys remain process
+configuration and are never included in GraphQL payloads or audit metadata.

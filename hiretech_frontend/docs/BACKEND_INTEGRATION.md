@@ -85,7 +85,28 @@ When the backend enables its production persisted-operation gate, set
 SHA-256 hash extension with each GraphQL document; the backend accepts only
 hashes present in `GRAPHQL_ALLOWED_OPERATION_HASHES` and fails closed on a
 missing, mismatched, or unknown hash. Keep the gate disabled until the
-deployment manifest contains the reviewed hash set.
+deployment manifest contains the reviewed hash set. The reviewed source of
+truth is `config/graphql-persisted-operations.json`; it contains the exact
+documents hashed by the browser so whitespace changes are visible in review.
+
+Regenerate and review that manifest whenever a frontend GraphQL document
+changes:
+
+```bash
+npm run persisted-operations:generate
+npm run persisted-operations:check
+```
+
+At deployment time, render the backend value without copying hashes by hand:
+
+```bash
+export GRAPHQL_ALLOWED_OPERATION_HASHES="$(npm run --silent persisted-operations:env)"
+```
+
+Enable `GRAPHQL_REQUIRE_PERSISTED_OPERATIONS=true` and
+`NEXT_PUBLIC_GRAPHQL_PERSISTED_OPERATIONS=true` only in the same bounded
+release after the generated manifest diff is approved. The check command fails
+when source documents and the committed manifest drift.
 
 ## Repository mapping
 
@@ -121,6 +142,7 @@ From the frontend directory:
 ```bash
 npm run lint
 npm run typecheck
+npm run persisted-operations:check
 npm run build
 npm run test:e2e
 ```

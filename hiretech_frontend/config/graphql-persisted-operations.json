@@ -1,0 +1,195 @@
+{
+  "version": 1,
+  "algorithm": "sha256",
+  "operations": [
+    {
+      "name": "AddQuestion",
+      "type": "mutation",
+      "sha256Hash": "7933948cc438f1d417d8669c3459d6bcc40d07f632260f050c43f34ec32612a6",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "mutation AddQuestion($input: CreateQuestionInput!) { addQuestion(input: $input) { id interviewId sequence type prompt competencyIds difficulty timeLimitSeconds createdAt } }"
+    },
+    {
+      "name": "AdminWorkspace",
+      "type": "query",
+      "sha256Hash": "ff7bcc1083b15db6255a37a665b986e9d8cda21ce28f09223e98e8726979ad40",
+      "source": "core/infrastructure/graphql/admin-repository.ts",
+      "query": "query AdminWorkspace { adminWorkspace { models { id modelId displayName providerLabel roles status latencyClass } prompts { id role name version promptTemplate status updatedAt updatedBy } rubric { id name version criteria { name weight } status updatedAt updatedBy } routing { id role primaryModelId fallbackModelId timeoutSeconds enabled updatedAt updatedBy } versions { id resource version action actor createdAt } auditEvents { id action actor target result occurredAt } } }"
+    },
+    {
+      "name": "ApproveQuestionDraft",
+      "type": "mutation",
+      "sha256Hash": "f8ab96c48b53b688c15dcdca4ef46982026275f740a84d912c7d845a4cd88fa3",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "mutation ApproveQuestionDraft($id: UUID!) { approveQuestionDraft(draftId: $id) { id interviewId sequence type prompt competencyIds difficulty timeLimitSeconds createdAt } }"
+    },
+    {
+      "name": "CancelInterview",
+      "type": "mutation",
+      "sha256Hash": "02c940805e8a06b1be30402a47985b39c51d926d2975c92a396e975901423e76",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "mutation CancelInterview($id: UUID!) { cancelInterview(interviewId: $id) { id organizationId candidateEmail candidateDisplayName title positionTitle seniority technologyTags mode language questionSource rubricVersion status startsAt expiresAt version questions { id interviewId sequence type prompt competencyIds difficulty timeLimitSeconds createdAt } } }"
+    },
+    {
+      "name": "CandidateInterview",
+      "type": "query",
+      "sha256Hash": "62cc1b9662385cff61b6580af9dd4dd41b8087dad3af0a58c5699ddbeb716096",
+      "source": "core/infrastructure/graphql/candidate-repository.ts",
+      "query": "query CandidateInterview($id: UUID!) { interview(id: $id) { id organizationId candidateEmail candidateDisplayName title positionTitle seniority technologyTags mode language questionSource rubricVersion status startsAt expiresAt startedAt completedAt version questions { id interviewId sequence type prompt competencyIds difficulty timeLimitSeconds createdAt } answers { id interviewId questionId status text codeLanguage codeContent idempotencyKey supersedesId submittedAt } } }"
+    },
+    {
+      "name": "CandidateInterviews",
+      "type": "query",
+      "sha256Hash": "397166bf57d0288b5f731b1b27abd7fa34df0a92d9bce1e558c01764b30f1f5e",
+      "source": "core/infrastructure/graphql/candidate-repository.ts",
+      "query": "query CandidateInterviews($limit: Int!) { interviews(limit: $limit) { id organizationId candidateEmail candidateDisplayName title positionTitle seniority technologyTags mode language questionSource rubricVersion status startsAt expiresAt startedAt completedAt version questions { id interviewId sequence type prompt competencyIds difficulty timeLimitSeconds createdAt } answers { id interviewId questionId status text codeLanguage codeContent idempotencyKey supersedesId submittedAt } } }"
+    },
+    {
+      "name": "CompleteInterview",
+      "type": "mutation",
+      "sha256Hash": "57dcf1efaa6edae77dad8e9e20da5cc3483b89f2e8ce2d56f65f7d0dc4010ea7",
+      "source": "core/infrastructure/graphql/candidate-repository.ts",
+      "query": "mutation CompleteInterview($interviewId: UUID!) { completeInterview(interviewId: $interviewId) { id organizationId candidateEmail candidateDisplayName title positionTitle seniority technologyTags mode language questionSource rubricVersion status startsAt expiresAt startedAt completedAt version questions { id interviewId sequence type prompt competencyIds difficulty timeLimitSeconds createdAt } answers { id interviewId questionId status text codeLanguage codeContent idempotencyKey supersedesId submittedAt } } }"
+    },
+    {
+      "name": "CreateAdminPromptVersion",
+      "type": "mutation",
+      "sha256Hash": "3184f803e154ad9eac754b0b53e1bfaa3786b124c228383f196fb5d20a0acaf6",
+      "source": "core/infrastructure/graphql/admin-repository.ts",
+      "query": "mutation CreateAdminPromptVersion($input: CreateAdminPromptVersionInput!) { createAdminPromptVersion(input: $input) { id role name version promptTemplate status updatedAt updatedBy } }"
+    },
+    {
+      "name": "CreateInterview",
+      "type": "mutation",
+      "sha256Hash": "c5cb0b9d9ed292b1d2c8740af848bfb14218731a660c0ddb17589c1d2808df2b",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "mutation CreateInterview($input: CreateInterviewInput!) { createInterview(input: $input) { id organizationId candidateEmail candidateDisplayName title positionTitle seniority technologyTags mode language questionSource rubricVersion status startsAt expiresAt version } }"
+    },
+    {
+      "name": "CreateInterviewInvitation",
+      "type": "mutation",
+      "sha256Hash": "f1d320bd20988374e22afcbacc7ca26420cef5e3e5f1496a4aeb0c1dcb46495b",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "mutation CreateInterviewInvitation($id: UUID!) { createInterviewInvitation(interviewId: $id) { invitationId token expiresAt } }"
+    },
+    {
+      "name": "MyOrganizations",
+      "type": "query",
+      "sha256Hash": "9b829797741d6b36558b6dcfce09b5127277bf8cea11d03634b956d4eac42dac",
+      "source": "core/infrastructure/api/auth-repositories.ts",
+      "query": "query MyOrganizations { organizations { organization { id name slug } } }"
+    },
+    {
+      "name": "PublishAdminRubric",
+      "type": "mutation",
+      "sha256Hash": "abc8dbe845a0de10d0b7d5cfdd9e935068d4f3e82fa48e16b0c30d0e14882d51",
+      "source": "core/infrastructure/graphql/admin-repository.ts",
+      "query": "mutation PublishAdminRubric($input: PublishAdminRubricInput!) { publishAdminRubric(input: $input) { id name version criteria { name weight } status updatedAt updatedBy } }"
+    },
+    {
+      "name": "PublishInterview",
+      "type": "mutation",
+      "sha256Hash": "36334e4c7fd1953153c7d1f0c44e6670051468b03f161d715f52cc861ed46ae3",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "mutation PublishInterview($id: UUID!) { publishInterview(interviewId: $id) { id organizationId candidateEmail candidateDisplayName title positionTitle seniority technologyTags mode language questionSource rubricVersion status startsAt expiresAt version questions { id interviewId sequence type prompt competencyIds difficulty timeLimitSeconds createdAt } } }"
+    },
+    {
+      "name": "RecordHumanReview",
+      "type": "mutation",
+      "sha256Hash": "3985a36e5fd224ea460d439da8a5411d16ed025a0942bbc71e1ce79008ef0c88",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "mutation RecordHumanReview($input: HumanReviewInput!) { recordHumanReview(input: $input) { id } }"
+    },
+    {
+      "name": "RecruiterInterview",
+      "type": "query",
+      "sha256Hash": "351125c4e951e8981584e9620c501c53c4f298a7193fc09137384e08072df857",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "query RecruiterInterview($id: UUID!) { interview(id: $id) { id organizationId candidateEmail candidateDisplayName title positionTitle seniority technologyTags mode language questionSource rubricVersion status startsAt expiresAt version questions { id interviewId sequence type prompt competencyIds difficulty timeLimitSeconds createdAt } } }"
+    },
+    {
+      "name": "RecruiterReport",
+      "type": "query",
+      "sha256Hash": "8a7ee26ae6113be90d6965c41929d711cab1488d89016c181f755a7aebba972f",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "query RecruiterReport($interviewId: UUID!) { evaluationReport(interviewId: $interviewId) { id interviewId status rubricId rubricVersion evaluatorConfigurationVersion overallScore overallConfidence criterionScores { criterionId applicable score maximumScore weight confidence rationale evidenceReferences limitations } strengths gaps evidenceReferences limitations humanReview { required urgency reasonCodes status reviewerUserId notes completedAt } generatedAt publishedAt createdAt updatedAt } interview(id: $interviewId) { id organizationId candidateEmail candidateDisplayName title positionTitle seniority technologyTags mode language questionSource rubricVersion status startsAt expiresAt version } }"
+    },
+    {
+      "name": "RecruiterWorkspace",
+      "type": "query",
+      "sha256Hash": "a8d3a385218d1be1e5e78f68cd20aacf3f173de9a470b380666bb0203faeb0b9",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "query RecruiterWorkspace($limit: Int!) { interviews(limit: $limit) { id organizationId candidateEmail candidateDisplayName title positionTitle seniority technologyTags mode language questionSource rubricVersion status startsAt expiresAt version } }"
+    },
+    {
+      "name": "RedeemCandidateInvitation",
+      "type": "mutation",
+      "sha256Hash": "f70f735f875fc8e928fb6b395d0c09646e3041b8f4804b7a59b684cd3cd2542b",
+      "source": "core/infrastructure/graphql/candidate-invitation-repository.ts",
+      "query": "mutation RedeemCandidateInvitation($input: RedeemInterviewInvitationInput!) { redeemInterviewInvitation(input: $input) { accessToken interview { id organizationId candidateDisplayName candidateEmail title technologyTags status startsAt expiresAt } } }"
+    },
+    {
+      "name": "RegisterAdminModel",
+      "type": "mutation",
+      "sha256Hash": "b4cb1cbac76d9d4cb374270d13e19bd919aa91026d4beb2e3b04c3f87ef9961f",
+      "source": "core/infrastructure/graphql/admin-repository.ts",
+      "query": "mutation RegisterAdminModel($input: RegisterAdminModelInput!) { registerAdminModel(input: $input) { id modelId displayName providerLabel roles status latencyClass } }"
+    },
+    {
+      "name": "RejectQuestionDraft",
+      "type": "mutation",
+      "sha256Hash": "edf4ba3518c463afe4b56137c125d2843bb11f35c3ca25f47317bd48d88f2ed7",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "mutation RejectQuestionDraft($input: RejectQuestionDraftInput!) { rejectQuestionDraft(input: $input) { id interviewId requestedBy reviewedBy type prompt competencyIds difficulty timeLimitSeconds language status modelId modelVersion reviewNotes createdAt reviewedAt } }"
+    },
+    {
+      "name": "RequestEvaluation",
+      "type": "mutation",
+      "sha256Hash": "82c3c260937a301567a7797de12e727badf86e2a3eb7e46eb86bd388a7c3ee06",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "mutation RequestEvaluation($interviewId: UUID!) { requestEvaluation(interviewId: $interviewId) { id interviewId status rubricId rubricVersion evaluatorConfigurationVersion overallScore overallConfidence criterionScores { criterionId applicable score maximumScore weight confidence rationale evidenceReferences limitations } strengths gaps evidenceReferences limitations humanReview { required urgency reasonCodes status reviewerUserId notes completedAt } generatedAt publishedAt createdAt updatedAt } }"
+    },
+    {
+      "name": "RequestQuestionDraft",
+      "type": "mutation",
+      "sha256Hash": "32deb7216d9af00010986dcffc55ea3eeb0dd555d3097ee584de0a94467407ce",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "mutation RequestQuestionDraft($input: RequestQuestionDraftInput!) { requestQuestionDraft(input: $input) { id interviewId requestedBy reviewedBy type prompt competencyIds difficulty timeLimitSeconds language status modelId modelVersion reviewNotes createdAt reviewedAt } }"
+    },
+    {
+      "name": "ReviewQuestionDraft",
+      "type": "query",
+      "sha256Hash": "2691d9d652d2523cc479cbdc6853d40360d1e626e1bd67566add16cf2e47f4e7",
+      "source": "core/infrastructure/graphql/recruiter-repository.ts",
+      "query": "query ReviewQuestionDraft($id: UUID!) { me { id } questionDraft(id: $id) { id interviewId requestedBy reviewedBy type prompt competencyIds difficulty timeLimitSeconds language status modelId modelVersion reviewNotes createdAt reviewedAt } }"
+    },
+    {
+      "name": "SelectOrganization",
+      "type": "mutation",
+      "sha256Hash": "7e105b2efe2c72128aaaf15b4bb7e537db259587ad6d8d7aaf837dc9001c3de4",
+      "source": "core/infrastructure/api/auth-repositories.ts",
+      "query": "mutation SelectOrganization($organizationId: UUID!) { selectOrganization(organizationId: $organizationId) { accessToken organization { id name slug } } }"
+    },
+    {
+      "name": "StartInterview",
+      "type": "mutation",
+      "sha256Hash": "df185b8e0e492b2eb505d3dd60f820605b5d1c91dc203857433d89c783fb5eb0",
+      "source": "core/infrastructure/graphql/candidate-repository.ts",
+      "query": "mutation StartInterview($interviewId: UUID!) { startInterview(interviewId: $interviewId) { id organizationId candidateEmail candidateDisplayName title positionTitle seniority technologyTags mode language questionSource rubricVersion status startsAt expiresAt startedAt completedAt version questions { id interviewId sequence type prompt competencyIds difficulty timeLimitSeconds createdAt } answers { id interviewId questionId status text codeLanguage codeContent idempotencyKey supersedesId submittedAt } } }"
+    },
+    {
+      "name": "SubmitCandidateAnswer",
+      "type": "mutation",
+      "sha256Hash": "5d6aaf32b28194edef06c4788b51cf3a4459e99dc08ad6215904ca41c75a2349",
+      "source": "core/infrastructure/graphql/candidate-repository.ts",
+      "query": "mutation SubmitCandidateAnswer($input: SubmitAnswerInput!) { submitAnswer(input: $input) { id interviewId questionId status text codeLanguage codeContent idempotencyKey supersedesId submittedAt } }"
+    },
+    {
+      "name": "UpdateAdminRouting",
+      "type": "mutation",
+      "sha256Hash": "4ac9e1707cb670550d28fb36d9d128792d81bc413f5d779a738a57b694151615",
+      "source": "core/infrastructure/graphql/admin-repository.ts",
+      "query": "mutation UpdateAdminRouting($input: UpdateAdminRoutingInput!) { updateAdminRouting(input: $input) { id role primaryModelId fallbackModelId timeoutSeconds enabled updatedAt updatedBy } }"
+    }
+  ]
+}

@@ -23,11 +23,18 @@ type OutboxRepository interface {
 // audit log store. Failed batches remain pending and are retried on the next
 // tick.
 type OutboxRelay struct {
-	repo     OutboxRepository
-	logger   *slog.Logger
-	batch    int
-	interval time.Duration
-	metrics  relayMetrics
+	repo               OutboxRepository
+	logger             *slog.Logger
+	batch              int
+	interval           time.Duration
+	maxBatchesPerCycle int
+	metrics            relayMetrics
+}
+
+type OutboxRelayConfig struct {
+	BatchSize          int
+	Interval           time.Duration
+	MaxBatchesPerCycle int
 }
 
 type relayMetrics struct {
@@ -38,12 +45,26 @@ type relayMetrics struct {
 }
 
 func NewOutboxRelay(repo OutboxRepository, logger *slog.Logger) *OutboxRelay {
+	return NewOutboxRelayWithConfig(repo, logger, OutboxRelayConfig{})
+}
+
+func NewOutboxRelayWithConfig(repo OutboxRepository, logger *slog.Logger, cfg OutboxRelayConfig) *OutboxRelay {
+	if cfg.BatchSize <= 0 {
+		cfg.BatchSize = defaultBatchSize
+	}
+	if cfg.Interval <= 0 {
+		cfg.Interval = defaultInterval
+	}
+	if cfg.MaxBatchesPerCycle <= 0 {
+		cfg.MaxBatchesPerCycle = 10
+	}
 	meter := otel.Meter("hiretech/audit")
 	return &OutboxRelay{
-		repo:     repo,
-		logger:   logger,
-		batch:    defaultBatchSize,
-		interval: defaultInterval,
+		repo:               repo,
+		logger:             logger,
+		batch:              cfg.BatchSize,
+		interval:           cfg.Interval,
+		maxBatchesPerCycle: cfg.MaxBatchesPerCycle,
 		metrics: relayMetrics{
 			batches:  newCounter(meter, "hiretech.audit.outbox.relay.batches", "Number of audit outbox relay attempts."),
 			events:   newCounter(meter, "hiretech.audit.outbox.relay.events", "Number of audit events projected by the relay."),
@@ -51,6 +72,21 @@ func NewOutboxRelay(repo OutboxRepository, logger *slog.Logger) *OutboxRelay {
 			duration: newHistogram(meter, "hiretech.audit.outbox.relay.duration", "Audit outbox relay duration in seconds."),
 		},
 	}
+}
+
+func (r *OutboxRelay) relayCycle(ctx context.Context) (int, error) {
+	total := 0
+	for batch := 0; batch < r.maxBatchesPerCycle; batch++ {
+		count, err := r.RelayOnce(ctx)
+		total += count
+		if err != nil || count < r.batch {
+			return total, err
+		}
+		if err := ctx.Err(); err != nil {
+			return total, err
+		}
+	}
+	return total, nil
 }
 
 func newCounter(meter metric.Meter, name, description string) metric.Int64Counter {
@@ -103,7 +139,7 @@ func (r *OutboxRelay) Run(ctx context.Context) {
 	ticker := time.NewTicker(r.interval)
 	defer ticker.Stop()
 	for {
-		if _, err := r.RelayOnce(ctx); err != nil && r.logger != nil {
+		if _, err := r.relayCycle(ctx); err != nil && r.logger != nil && ctx.Err() == nil {
 			r.logger.Error("audit outbox relay failed", "error", err)
 		}
 		select {

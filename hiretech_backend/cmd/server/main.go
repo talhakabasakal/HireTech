@@ -137,8 +137,12 @@ func run() error {
 	}
 	serviceCtx, serviceCancel := context.WithCancel(context.Background())
 	defer serviceCancel()
-	if outboxRepo, ok := deps.AuditRepo.(auditUC.OutboxRepository); ok {
-		go auditUC.NewOutboxRelay(outboxRepo, log).Run(serviceCtx)
+	if outboxRepo, ok := deps.AuditRepo.(auditUC.OutboxRepository); ok && cfg.Audit.RelayEnabled {
+		relay := auditUC.NewOutboxRelayWithConfig(outboxRepo, log, auditUC.OutboxRelayConfig{
+			BatchSize: cfg.Audit.RelayBatchSize, Interval: cfg.Audit.RelayInterval,
+			MaxBatchesPerCycle: cfg.Audit.RelayMaxBatchesPerCycle,
+		})
+		go relay.Run(serviceCtx)
 	}
 
 	// Build router

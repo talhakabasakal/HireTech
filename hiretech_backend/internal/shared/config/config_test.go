@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -39,6 +40,20 @@ func TestLoad_PersistedOperationConfiguration(t *testing.T) {
 
 	assert.True(t, cfg.GraphQL.RequirePersistedOperations)
 	assert.Equal(t, []string{"abc", "123"}, cfg.GraphQL.AllowedOperationHashes)
+}
+
+func TestLoad_AuditRelayConfiguration(t *testing.T) {
+	t.Setenv("AUDIT_RELAY_ENABLED", "true")
+	t.Setenv("AUDIT_RELAY_BATCH_SIZE", "250")
+	t.Setenv("AUDIT_RELAY_INTERVAL_MILLISECONDS", "500")
+	t.Setenv("AUDIT_RELAY_MAX_BATCHES_PER_CYCLE", "20")
+
+	cfg := Load()
+
+	assert.True(t, cfg.Audit.RelayEnabled)
+	assert.Equal(t, 250, cfg.Audit.RelayBatchSize)
+	assert.Equal(t, 500*time.Millisecond, cfg.Audit.RelayInterval)
+	assert.Equal(t, 20, cfg.Audit.RelayMaxBatchesPerCycle)
 }
 
 func TestConfig_ValidateForProductionRejectsDefaultJWTSecret(t *testing.T) {
@@ -86,6 +101,17 @@ func TestConfig_ValidateForProductionRequiresPersistedOperationHashesWhenEnabled
 	}, GraphQL: GraphQLConfig{RequirePersistedOperations: true}}
 
 	assert.EqualError(t, cfg.ValidateForProduction(), "GRAPHQL_ALLOWED_OPERATION_HASHES must be configured when persisted operations are required")
+}
+
+func TestConfig_ValidateForProductionRejectsInvalidAuditRelayBounds(t *testing.T) {
+	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{
+		Algorithm:     "RS256",
+		PrivateKeyPEM: "configured",
+		PublicKeys:    map[string]string{"active": "configured"},
+		ActiveKeyID:   "active",
+	}, Audit: AuditConfig{RelayEnabled: true}}
+
+	assert.EqualError(t, cfg.ValidateForProduction(), "audit relay batch size, interval, and max batches per cycle must be positive in production")
 }
 
 func TestAIConfig_ValidateForProductionRejectsSmoketestModel(t *testing.T) {

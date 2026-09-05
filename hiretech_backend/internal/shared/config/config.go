@@ -23,6 +23,7 @@ type Config struct {
 	Kafka       KafkaConfig
 	WebSocket   WebSocketConfig
 	GraphQL     GraphQLConfig
+	Audit       AuditConfig
 	Log         LogConfig
 	AI          AIConfig
 }
@@ -76,6 +77,11 @@ func (c *Config) ValidateForProduction() error {
 			}
 		}
 	}
+	if c.Audit.RelayEnabled {
+		if c.Audit.RelayBatchSize <= 0 || c.Audit.RelayInterval <= 0 || c.Audit.RelayMaxBatchesPerCycle <= 0 {
+			return fmt.Errorf("audit relay batch size, interval, and max batches per cycle must be positive in production")
+		}
+	}
 	return nil
 }
 
@@ -104,6 +110,14 @@ type WebSocketConfig struct {
 type GraphQLConfig struct {
 	RequirePersistedOperations bool
 	AllowedOperationHashes     []string
+}
+
+// AuditConfig controls the bounded transactional outbox relay.
+type AuditConfig struct {
+	RelayEnabled            bool
+	RelayBatchSize          int
+	RelayInterval           time.Duration
+	RelayMaxBatchesPerCycle int
 }
 
 // ServerConfig holds HTTP server settings.
@@ -311,6 +325,12 @@ func Load() *Config {
 		GraphQL: GraphQLConfig{
 			RequirePersistedOperations: envOrDefault("GRAPHQL_REQUIRE_PERSISTED_OPERATIONS", "false") == "true",
 			AllowedOperationHashes:     parseHashList(os.Getenv("GRAPHQL_ALLOWED_OPERATION_HASHES")),
+		},
+		Audit: AuditConfig{
+			RelayEnabled:            envOrDefault("AUDIT_RELAY_ENABLED", "true") == "true",
+			RelayBatchSize:          envOrDefaultInt("AUDIT_RELAY_BATCH_SIZE", 100),
+			RelayInterval:           time.Duration(envOrDefaultInt("AUDIT_RELAY_INTERVAL_MILLISECONDS", 2000)) * time.Millisecond,
+			RelayMaxBatchesPerCycle: envOrDefaultInt("AUDIT_RELAY_MAX_BATCHES_PER_CYCLE", 10),
 		},
 		Log: LogConfig{
 			Level:  envOrDefault("LOG_LEVEL", "info"),

@@ -132,12 +132,18 @@ Required validation commands:
 
 ## Known limitations and production prerequisites
 
-- Audit mutations populate the outbox transactionally, and the server now runs a bounded in-process relay that projects pending rows idempotently into `audit_logs`. A separately monitored worker remains recommended for high-volume production deployments.
+- Audit mutations populate the outbox transactionally, and each enabled server
+  instance runs a configurable bounded relay that projects pending rows
+  idempotently into `audit_logs`. Full batches drain consecutively up to a
+  configured per-cycle limit, then yield. `FOR UPDATE SKIP LOCKED` keeps
+  horizontal workers safe.
 - Admin configuration versions, transactional admin lifecycle events, and the
   generic request audit projection are available. The bounded relay now emits
   batch, projected-event, failure, and duration metrics through the existing
-  OpenTelemetry/Prometheus pipeline. Retention, integrity verification, and a
-  separately operated high-volume worker remain production hardening work.
+  OpenTelemetry/Prometheus pipeline. Alert routing and whether relay capacity
+  runs in API instances or a separately deployed process remain production
+  operations decisions. Retention and integrity verification remain hardening
+  work.
 - `interviewUpdated` is implemented for lifecycle notifications. A durable
   reconnect cursor, cross-instance subscription fan-out, evaluation-specific
   streams, and a separately operated high-volume subscription worker remain

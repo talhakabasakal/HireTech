@@ -367,6 +367,10 @@ All configuration is via environment variables with sensible defaults:
 | `REDIS_HOST` | `localhost` | Redis host |
 | `REDIS_PORT` | `6379` | Redis port |
 | `REDIS_HOST_BIND` | `127.0.0.1` | Docker Compose host bind for Redis (dev only) |
+| `AUDIT_RELAY_ENABLED` | `true` | Run the transactional audit outbox relay in this API instance |
+| `AUDIT_RELAY_BATCH_SIZE` | `100` | Maximum outbox rows locked and projected per batch |
+| `AUDIT_RELAY_INTERVAL_MILLISECONDS` | `2000` | Delay between bounded relay cycles |
+| `AUDIT_RELAY_MAX_BATCHES_PER_CYCLE` | `10` | Maximum consecutive full batches drained before yielding |
 | `KAFKA_ENABLED` | `false` | Enable Kafka event bus |
 | `KAFKA_BROKERS` | `localhost:9092` | Kafka broker addresses (comma-separated) |
 | `KAFKA_GROUP_ID` | `masterfabric-go` | Kafka consumer group ID |

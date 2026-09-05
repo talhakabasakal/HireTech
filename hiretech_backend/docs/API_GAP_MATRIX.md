@@ -73,7 +73,7 @@ The mappings below show which existing use cases may be reused. They do not auth
 | App/workspace routes | Not in initial product GraphQL schema | Preserve through REST | Add later only if frontend product needs these concepts |
 | API-key routes | No frontend operation | Preserve through restricted REST/admin tooling | Do not expose provider/API credentials through product GraphQL |
 | Managed endpoint routes | No frontend operation | Preserve as platform administration REST | Do not use dynamic endpoints as an interview data model |
-| Audit list routes | `adminAuditEvents` GraphQL connection plus existing REST list routes | Transactional outbox writes, bounded relay, and tenant-scoped projection exist | Add retention/integrity controls and stronger permission tests |
+| Audit list routes | `adminAuditEvents` GraphQL connection plus existing REST list routes | Transactional outbox writes, horizontally safe configurable backlog draining, relay metrics, and tenant-scoped projection exist | Add retention/integrity controls, deploy alert routing, and strengthen permission tests |
 | `/api/v1/ws` | Generic organization/app event stream remains compatible | Keep existing stream; GraphQL interview stream is separate | GraphQL subscription authorization and lifecycle events implemented; reconnect cursor remains |
 
 ## 5. Product-domain gap matrix

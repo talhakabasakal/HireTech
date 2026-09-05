@@ -38,6 +38,13 @@ func adminVersionGraphQL(value *aiadminModel.ConfigurationVersion) *model.AdminC
 	return &model.AdminConfigurationVersion{ID: value.ID, Resource: value.Resource, Version: value.Version, Action: value.Action, Status: value.Status, Actor: value.Actor, CreatedAt: value.CreatedAt}
 }
 
+func adminAuditEventGraphQL(value *aiadminModel.AuditEvent) *model.AdminAuditEvent {
+	if value == nil {
+		return nil
+	}
+	return &model.AdminAuditEvent{ID: value.ID, Action: value.Action, Actor: value.Actor, Target: value.Target, Result: value.Result, OccurredAt: value.OccurredAt}
+}
+
 func adminWorkspaceGraphQL(value *aiadminModel.Workspace) *model.AdminWorkspace {
 	result := &model.AdminWorkspace{Models: []*model.AdminModel{}, Prompts: []*model.AdminPromptConfiguration{}, Routing: []*model.AdminRoutingRule{}, Versions: []*model.AdminConfigurationVersion{}, AuditEvents: []*model.AdminAuditEvent{}}
 	for _, item := range value.Models {
@@ -56,7 +63,7 @@ func adminWorkspaceGraphQL(value *aiadminModel.Workspace) *model.AdminWorkspace 
 		result.Versions = append(result.Versions, &model.AdminConfigurationVersion{ID: item.ID, Resource: item.Resource, Version: item.Version, Action: item.Action, Status: item.Status, Actor: item.Actor, CreatedAt: item.CreatedAt})
 	}
 	for _, item := range value.AuditEvents {
-		result.AuditEvents = append(result.AuditEvents, &model.AdminAuditEvent{ID: item.ID, Action: item.Action, Actor: item.Actor, Target: item.Target, Result: item.Result, OccurredAt: item.OccurredAt})
+		result.AuditEvents = append(result.AuditEvents, adminAuditEventGraphQL(item))
 	}
 	return result
 }

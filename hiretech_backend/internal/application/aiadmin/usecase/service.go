@@ -13,6 +13,7 @@ import (
 	"github.com/masterfabric-go/masterfabric/internal/shared/authcontext"
 	"github.com/masterfabric-go/masterfabric/internal/shared/config"
 	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
+	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
 	"github.com/masterfabric-go/masterfabric/internal/shared/permissions"
 )
 
@@ -22,6 +23,13 @@ type Service struct {
 	repo       aiadminRepo.Repository
 	audit      auditRepo.AuditRepository
 	recentAuth time.Duration
+}
+
+// AuditPage is the bounded admin audit connection result.
+type AuditPage struct {
+	Events      []*aiadminModel.AuditEvent
+	HasNextPage bool
+	EndCursor   string
 }
 
 func NewService(repo aiadminRepo.Repository, audit auditRepo.AuditRepository, security ...config.SecurityConfig) *Service {
@@ -70,6 +78,56 @@ func (s *Service) Workspace(ctx context.Context, actor authcontext.ActorContext)
 		workspace.AuditEvents = append(workspace.AuditEvents, &aiadminModel.AuditEvent{ID: log.ID, Action: log.Action, Actor: actorID, Target: log.ResourceType + ":" + log.ResourceID, Result: result, OccurredAt: log.CreatedAt})
 	}
 	return workspace, nil
+}
+
+// AuditPage returns tenant-scoped audit events through a keyset cursor. The
+// separate method avoids making the configuration workspace a hidden 100-row
+// audit API and keeps audit reads independently bounded.
+func (s *Service) AuditPage(ctx context.Context, actor authcontext.ActorContext, after *pagination.Cursor, first int) (AuditPage, error) {
+	if err := require(actor, "audit:read"); err != nil {
+		return AuditPage{}, err
+	}
+	if err := requireMFA(actor, s.recentAuth); err != nil {
+		return AuditPage{}, err
+	}
+	if first <= 0 || first > 100 {
+		return AuditPage{}, domainErr.New(domainErr.ErrValidation, "first must be between 1 and 100", nil)
+	}
+	cursorRepo, ok := s.audit.(auditRepo.CursorAuditRepository)
+	if !ok {
+		return AuditPage{}, domainErr.New(domainErr.ErrNotImplemented, "cursor audit administration is not configured", nil)
+	}
+	logs, err := cursorRepo.ListByOrgPage(ctx, actor.OrganizationID, after, first+1)
+	if err != nil {
+		return AuditPage{}, err
+	}
+	page := AuditPage{Events: make([]*aiadminModel.AuditEvent, 0, len(logs))}
+	if len(logs) > first {
+		page.HasNextPage = true
+		logs = logs[:first]
+	}
+	for _, log := range logs {
+		actorID := uuid.Nil
+		if log.UserID != nil {
+			actorID = *log.UserID
+		}
+		result := "success"
+		var metadata struct {
+			Outcome string `json:"outcome"`
+		}
+		if json.Unmarshal(log.Metadata, &metadata) == nil && !strings.EqualFold(metadata.Outcome, "SUCCESS") && metadata.Outcome != "" {
+			result = "denied"
+		}
+		page.Events = append(page.Events, &aiadminModel.AuditEvent{ID: log.ID, Action: log.Action, Actor: actorID, Target: log.ResourceType + ":" + log.ResourceID, Result: result, OccurredAt: log.CreatedAt})
+	}
+	if len(logs) > 0 {
+		last := logs[len(logs)-1]
+		page.EndCursor, err = pagination.EncodeCursor(last.CreatedAt, last.ID)
+		if err != nil {
+			return AuditPage{}, domainErr.New(domainErr.ErrInternal, "failed to encode audit cursor", err)
+		}
+	}
+	return page, nil
 }
 
 func (s *Service) RegisterModel(ctx context.Context, actor authcontext.ActorContext, input aiadminModel.RegisterModelInput) (*aiadminModel.Model, error) {

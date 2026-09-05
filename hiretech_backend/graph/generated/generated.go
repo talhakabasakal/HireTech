@@ -49,6 +49,11 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	AdminAuditConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
+	}
+
 	AdminAuditEvent struct {
 		Action     func(childComplexity int) int
 		Actor      func(childComplexity int) int
@@ -56,6 +61,11 @@ type ComplexityRoot struct {
 		OccurredAt func(childComplexity int) int
 		Result     func(childComplexity int) int
 		Target     func(childComplexity int) int
+	}
+
+	AdminAuditEventEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
 	}
 
 	AdminConfigurationVersion struct {
@@ -275,6 +285,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		AdminAuditEvents    func(childComplexity int, first *int, after *string) int
 		AdminWorkspace      func(childComplexity int) int
 		Answer              func(childComplexity int, id uuid.UUID) int
 		EvaluationReport    func(childComplexity int, interviewID uuid.UUID) int
@@ -374,6 +385,7 @@ type QueryResolver interface {
 	QuestionDraft(ctx context.Context, id uuid.UUID) (*model.QuestionDraft, error)
 	EvaluationReport(ctx context.Context, interviewID uuid.UUID) (*model.EvaluationReport, error)
 	AdminWorkspace(ctx context.Context) (*model.AdminWorkspace, error)
+	AdminAuditEvents(ctx context.Context, first *int, after *string) (*model.AdminAuditConnection, error)
 }
 
 type executableSchema struct {
@@ -394,6 +406,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	ec := executionContext{nil, e, 0, 0, nil}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "AdminAuditConnection.edges":
+		if e.complexity.AdminAuditConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.AdminAuditConnection.Edges(childComplexity), true
+	case "AdminAuditConnection.pageInfo":
+		if e.complexity.AdminAuditConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.AdminAuditConnection.PageInfo(childComplexity), true
 
 	case "AdminAuditEvent.action":
 		if e.complexity.AdminAuditEvent.Action == nil {
@@ -431,6 +456,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.AdminAuditEvent.Target(childComplexity), true
+
+	case "AdminAuditEventEdge.cursor":
+		if e.complexity.AdminAuditEventEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.AdminAuditEventEdge.Cursor(childComplexity), true
+	case "AdminAuditEventEdge.node":
+		if e.complexity.AdminAuditEventEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.AdminAuditEventEdge.Node(childComplexity), true
 
 	case "AdminConfigurationVersion.action":
 		if e.complexity.AdminConfigurationVersion.Action == nil {
@@ -1493,6 +1531,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.PageInfo.HasNextPage(childComplexity), true
 
+	case "Query.adminAuditEvents":
+		if e.complexity.Query.AdminAuditEvents == nil {
+			break
+		}
+
+		args, err := ec.field_Query_adminAuditEvents_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.AdminAuditEvents(childComplexity, args["first"].(*int), args["after"].(*string)), true
 	case "Query.adminWorkspace":
 		if e.complexity.Query.AdminWorkspace == nil {
 			break
@@ -2103,6 +2152,16 @@ type AdminAuditEvent {
   occurredAt: DateTime!
 }
 
+type AdminAuditEventEdge {
+  cursor: String!
+  node: AdminAuditEvent!
+}
+
+type AdminAuditConnection {
+  edges: [AdminAuditEventEdge!]!
+  pageInfo: PageInfo!
+}
+
 type AdminWorkspace {
   models: [AdminModel!]!
   prompts: [AdminPromptConfiguration!]!
@@ -2389,6 +2448,7 @@ type Query {
   questionDraft(id: UUID!): QuestionDraft
   evaluationReport(interviewId: UUID!): EvaluationReport
   adminWorkspace: AdminWorkspace!
+  adminAuditEvents(first: Int = 50, after: String): AdminAuditConnection!
 }
 
 type Mutation {
@@ -2689,6 +2749,22 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_adminAuditEvents_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_answer_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2832,6 +2908,76 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 // endregion ************************** directives.gotpl **************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _AdminAuditConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.AdminAuditConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AdminAuditConnection_edges,
+		func(ctx context.Context) (any, error) {
+			return obj.Edges, nil
+		},
+		nil,
+		ec.marshalNAdminAuditEventEdge2ᚕᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐAdminAuditEventEdgeᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AdminAuditConnection_edges(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdminAuditConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "cursor":
+				return ec.fieldContext_AdminAuditEventEdge_cursor(ctx, field)
+			case "node":
+				return ec.fieldContext_AdminAuditEventEdge_node(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AdminAuditEventEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AdminAuditConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.AdminAuditConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AdminAuditConnection_pageInfo,
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		ec.marshalNPageInfo2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐPageInfo,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AdminAuditConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdminAuditConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
 
 func (ec *executionContext) _AdminAuditEvent_id(ctx context.Context, field graphql.CollectedField, obj *model.AdminAuditEvent) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
@@ -3002,6 +3148,78 @@ func (ec *executionContext) fieldContext_AdminAuditEvent_occurredAt(_ context.Co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AdminAuditEventEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.AdminAuditEventEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AdminAuditEventEdge_cursor,
+		func(ctx context.Context) (any, error) {
+			return obj.Cursor, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AdminAuditEventEdge_cursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdminAuditEventEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AdminAuditEventEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.AdminAuditEventEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AdminAuditEventEdge_node,
+		func(ctx context.Context) (any, error) {
+			return obj.Node, nil
+		},
+		nil,
+		ec.marshalNAdminAuditEvent2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐAdminAuditEvent,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AdminAuditEventEdge_node(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdminAuditEventEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_AdminAuditEvent_id(ctx, field)
+			case "action":
+				return ec.fieldContext_AdminAuditEvent_action(ctx, field)
+			case "actor":
+				return ec.fieldContext_AdminAuditEvent_actor(ctx, field)
+			case "target":
+				return ec.fieldContext_AdminAuditEvent_target(ctx, field)
+			case "result":
+				return ec.fieldContext_AdminAuditEvent_result(ctx, field)
+			case "occurredAt":
+				return ec.fieldContext_AdminAuditEvent_occurredAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AdminAuditEvent", field.Name)
 		},
 	}
 	return fc, nil
@@ -9315,6 +9533,53 @@ func (ec *executionContext) fieldContext_Query_adminWorkspace(_ context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_adminAuditEvents(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_adminAuditEvents,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().AdminAuditEvents(ctx, fc.Args["first"].(*int), fc.Args["after"].(*string))
+		},
+		nil,
+		ec.marshalNAdminAuditConnection2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐAdminAuditConnection,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_adminAuditEvents(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_AdminAuditConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_AdminAuditConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AdminAuditConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_adminAuditEvents_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -12592,6 +12857,50 @@ func (ec *executionContext) unmarshalInputUpdateAdminRoutingInput(ctx context.Co
 
 // region    **************************** object.gotpl ****************************
 
+var adminAuditConnectionImplementors = []string{"AdminAuditConnection"}
+
+func (ec *executionContext) _AdminAuditConnection(ctx context.Context, sel ast.SelectionSet, obj *model.AdminAuditConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, adminAuditConnectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AdminAuditConnection")
+		case "edges":
+			out.Values[i] = ec._AdminAuditConnection_edges(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pageInfo":
+			out.Values[i] = ec._AdminAuditConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var adminAuditEventImplementors = []string{"AdminAuditEvent"}
 
 func (ec *executionContext) _AdminAuditEvent(ctx context.Context, sel ast.SelectionSet, obj *model.AdminAuditEvent) graphql.Marshaler {
@@ -12630,6 +12939,50 @@ func (ec *executionContext) _AdminAuditEvent(ctx context.Context, sel ast.Select
 			}
 		case "occurredAt":
 			out.Values[i] = ec._AdminAuditEvent_occurredAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var adminAuditEventEdgeImplementors = []string{"AdminAuditEventEdge"}
+
+func (ec *executionContext) _AdminAuditEventEdge(ctx context.Context, sel ast.SelectionSet, obj *model.AdminAuditEventEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, adminAuditEventEdgeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AdminAuditEventEdge")
+		case "cursor":
+			out.Values[i] = ec._AdminAuditEventEdge_cursor(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "node":
+			out.Values[i] = ec._AdminAuditEventEdge_node(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -14401,6 +14754,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "adminAuditEvents":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_adminAuditEvents(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -15071,6 +15446,20 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
+func (ec *executionContext) marshalNAdminAuditConnection2githubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐAdminAuditConnection(ctx context.Context, sel ast.SelectionSet, v model.AdminAuditConnection) graphql.Marshaler {
+	return ec._AdminAuditConnection(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNAdminAuditConnection2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐAdminAuditConnection(ctx context.Context, sel ast.SelectionSet, v *model.AdminAuditConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AdminAuditConnection(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNAdminAuditEvent2ᚕᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐAdminAuditEventᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.AdminAuditEvent) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -15123,6 +15512,60 @@ func (ec *executionContext) marshalNAdminAuditEvent2ᚖgithubᚗcomᚋmasterfabr
 		return graphql.Null
 	}
 	return ec._AdminAuditEvent(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNAdminAuditEventEdge2ᚕᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐAdminAuditEventEdgeᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.AdminAuditEventEdge) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNAdminAuditEventEdge2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐAdminAuditEventEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNAdminAuditEventEdge2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐAdminAuditEventEdge(ctx context.Context, sel ast.SelectionSet, v *model.AdminAuditEventEdge) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AdminAuditEventEdge(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNAdminConfigurationVersion2githubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐAdminConfigurationVersion(ctx context.Context, sel ast.SelectionSet, v model.AdminConfigurationVersion) graphql.Marshaler {

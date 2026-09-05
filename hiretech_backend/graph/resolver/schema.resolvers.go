@@ -536,6 +536,47 @@ func (r *queryResolver) AdminWorkspace(ctx context.Context) (*model.AdminWorkspa
 	return adminWorkspaceGraphQL(value), err
 }
 
+// AdminAuditEvents is the independently bounded, tenant-scoped audit
+// connection. It requires the same admin MFA/read policy as the workspace.
+func (r *queryResolver) AdminAuditEvents(ctx context.Context, first *int, after *string) (*model.AdminAuditConnection, error) {
+	actor, err := requireActor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if r.AIAdminUseCase == nil {
+		return nil, notConfigured("audit administration")
+	}
+	pageSize := 50
+	if first != nil {
+		pageSize = *first
+	}
+	var cursor *pagination.Cursor
+	if after != nil && strings.TrimSpace(*after) != "" {
+		decoded, decodeErr := pagination.DecodeCursor(*after)
+		if decodeErr != nil {
+			return nil, domainErr.New(domainErr.ErrValidation, "after cursor is invalid", decodeErr)
+		}
+		cursor = &decoded
+	}
+	page, err := r.AIAdminUseCase.AuditPage(ctx, actor, cursor, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	edges := make([]*model.AdminAuditEventEdge, 0, len(page.Events))
+	for _, value := range page.Events {
+		edgeCursor, cursorErr := pagination.EncodeCursor(value.OccurredAt, value.ID)
+		if cursorErr != nil {
+			return nil, domainErr.New(domainErr.ErrInternal, "failed to encode audit cursor", cursorErr)
+		}
+		edges = append(edges, &model.AdminAuditEventEdge{Cursor: edgeCursor, Node: adminAuditEventGraphQL(value)})
+	}
+	var endCursor *string
+	if page.EndCursor != "" {
+		endCursor = &page.EndCursor
+	}
+	return &model.AdminAuditConnection{Edges: edges, PageInfo: &model.PageInfo{HasNextPage: page.HasNextPage, EndCursor: endCursor}}, nil
+}
+
 // Interview returns generated.InterviewResolver implementation.
 func (r *Resolver) Interview() generated.InterviewResolver { return &interviewResolver{r} }
 

@@ -33,7 +33,7 @@ Status values:
 | Existing WebSocket compatibility | Organization/app domain-event stream exists | Remain available; do not overload it with candidate chat semantics | Implemented; protect with tests | 0 onward |
 | GraphQL schema lifecycle | Source-controlled schema and generated gqlgen transport/model code | Schema-first source, generated code, linting, registry, breaking-change gate | Partial | 0–1 |
 | GraphQL error contract | Sanitized errors with stable codes and request ID | Sanitized GraphQL errors with stable `extensions.code` and request ID | Implemented; expand contract tests | 0 onward |
-| GraphQL pagination | `interviewConnection` now provides an opaque keyset cursor with `first` capped at 100; legacy list fields remain | Opaque cursor connections across remaining list surfaces, bounded page size | Partial | Extend to audit/admin connections |
+| GraphQL pagination | `interviewConnection` and `adminAuditEvents` provide opaque keyset cursors with bounded page sizes; legacy list fields remain | Opaque cursor connections across remaining list surfaces, bounded page size | Partial | Extend to remaining organization/evaluation surfaces |
 | GraphQL request limits | Body, operation, depth, node, alias, fragment, complexity, introspection, and timeout limits | Same controls with regression coverage | Implemented; protect with tests | 0 onward |
 | Resolver batching | None | Request-scoped, tenant-keyed DataLoaders | Missing | 1 |
 | Persisted operations | Optional fail-closed SHA-256 allowlist gate and frontend hash emission are implemented; disabled until a reviewed manifest is provisioned | Production frontend allowlist after schema stabilization | Partial | Provision reviewed hashes and enable in production |
@@ -73,7 +73,7 @@ The mappings below show which existing use cases may be reused. They do not auth
 | App/workspace routes | Not in initial product GraphQL schema | Preserve through REST | Add later only if frontend product needs these concepts |
 | API-key routes | No frontend operation | Preserve through restricted REST/admin tooling | Do not expose provider/API credentials through product GraphQL |
 | Managed endpoint routes | No frontend operation | Preserve as platform administration REST | Do not use dynamic endpoints as an interview data model |
-| Audit list routes | Future GraphQL audit connection | Transactional outbox writes, bounded relay, and tenant-scoped projection exist | Add a paginated GraphQL connection, redaction coverage, and stronger permission tests |
+| Audit list routes | `adminAuditEvents` GraphQL connection plus existing REST list routes | Transactional outbox writes, bounded relay, and tenant-scoped projection exist | Add retention/integrity controls and stronger permission tests |
 | `/api/v1/ws` | `interviewUpdated`, `evaluationUpdated` | Event bus/hub concepts reusable | Add GraphQL subscription authorization and interview-specific events |
 
 ## 5. Product-domain gap matrix
@@ -138,7 +138,7 @@ The mappings below show which existing use cases may be reused. They do not auth
 | Evaluation data | Scores, rationale, confidence, review notes | None | Explainability, evidence links, review gate, bias monitoring, restricted access |
 | LLM payload | Prompt, context, output, usage | None | Data minimization, provider policy, residency, no-training contract, redaction, bounded retention |
 | Admin configuration | Prompts, models, rubrics, routing | None | Versioning, dual control, secret references, rollout/rollback, complete audit |
-| Audit data | Actor/action/resource/IP metadata; transactional outbox writes, bounded idempotent relay, and relay batch/event/error/latency metrics | Immutable policy, restricted reads, integrity and retention controls; add retention and integrity verification |
+| Audit data | Actor/action/resource/IP metadata; transactional outbox writes, bounded idempotent relay, relay metrics, and cursor-scoped admin read | Immutable policy, restricted reads, integrity and retention controls; add retention and integrity verification |
 
 ## 9. Remaining implementation dependencies and critical path
 

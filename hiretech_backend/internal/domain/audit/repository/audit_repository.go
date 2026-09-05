@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/masterfabric-go/masterfabric/internal/domain/audit/model"
+	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
 )
 
 // AuditRepository defines the interface for audit log persistence.
@@ -25,4 +26,10 @@ type OutboxRepository interface {
 // Implementations must apply the organization predicate in storage.
 type OrganizationScopedUserAuditRepository interface {
 	ListByUserInOrg(ctx context.Context, orgID, userID uuid.UUID, offset, limit int) ([]*model.AuditLog, int, error)
+}
+
+// CursorAuditRepository is the bounded, organization-scoped audit read
+// contract used by cursor-based API connections.
+type CursorAuditRepository interface {
+	ListByOrgPage(ctx context.Context, orgID uuid.UUID, after *pagination.Cursor, limit int) ([]*model.AuditLog, error)
 }

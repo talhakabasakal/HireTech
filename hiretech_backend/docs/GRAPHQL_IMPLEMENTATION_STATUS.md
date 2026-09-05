@@ -27,6 +27,9 @@ Phase 4 and Phase 5 add:
   `createAdminPromptVersion`, `updateAdminRouting`, and `publishAdminRubric`.
   The workspace supplies the current tenant's model, prompt, rubric, routing,
   immutable configuration-version, and restricted audit projections.
+- `adminAuditEvents(first, after)` provides an independently bounded,
+  tenant-scoped keyset connection for audit history; it requires `audit:read`,
+  recent authentication/MFA, and a cursor-capable audit repository.
 
 The schema remains source-controlled at `graph/schema.graphqls`; gqlgen transport code is generated under `graph/generated` and `graph/model`. Resolvers are thin adapters over application services.
 
@@ -117,9 +120,8 @@ Required validation commands:
 - Admin configuration versions, transactional admin lifecycle events, and the
   generic request audit projection are available. The bounded relay now emits
   batch, projected-event, failure, and duration metrics through the existing
-  OpenTelemetry/Prometheus pipeline. Paginated audit connections, retention,
-  integrity verification, and a separately operated high-volume worker remain
-  production hardening work.
+  OpenTelemetry/Prometheus pipeline. Retention, integrity verification, and a
+  separately operated high-volume worker remain production hardening work.
 - GraphQL subscriptions remain deferred. Persisted-operation hash allowlisting
   is implemented behind `GRAPHQL_REQUIRE_PERSISTED_OPERATIONS`; keep it
   disabled until `GRAPHQL_ALLOWED_OPERATION_HASHES` contains the reviewed

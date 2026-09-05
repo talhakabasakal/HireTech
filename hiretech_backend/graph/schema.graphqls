@@ -175,6 +175,16 @@ type AdminAuditEvent {
   occurredAt: DateTime!
 }
 
+type AdminAuditEventEdge {
+  cursor: String!
+  node: AdminAuditEvent!
+}
+
+type AdminAuditConnection {
+  edges: [AdminAuditEventEdge!]!
+  pageInfo: PageInfo!
+}
+
 type AdminWorkspace {
   models: [AdminModel!]!
   prompts: [AdminPromptConfiguration!]!
@@ -461,6 +471,7 @@ type Query {
   questionDraft(id: UUID!): QuestionDraft
   evaluationReport(interviewId: UUID!): EvaluationReport
   adminWorkspace: AdminWorkspace!
+  adminAuditEvents(first: Int = 50, after: String): AdminAuditConnection!
 }
 
 type Mutation {

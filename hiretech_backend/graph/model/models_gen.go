@@ -12,6 +12,11 @@ import (
 	"github.com/google/uuid"
 )
 
+type AdminAuditConnection struct {
+	Edges    []*AdminAuditEventEdge `json:"edges"`
+	PageInfo *PageInfo              `json:"pageInfo"`
+}
+
 type AdminAuditEvent struct {
 	ID         uuid.UUID `json:"id"`
 	Action     string    `json:"action"`
@@ -19,6 +24,11 @@ type AdminAuditEvent struct {
 	Target     string    `json:"target"`
 	Result     string    `json:"result"`
 	OccurredAt time.Time `json:"occurredAt"`
+}
+
+type AdminAuditEventEdge struct {
+	Cursor string           `json:"cursor"`
+	Node   *AdminAuditEvent `json:"node"`
 }
 
 type AdminConfigurationVersion struct {

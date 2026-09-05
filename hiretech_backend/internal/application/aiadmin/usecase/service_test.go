@@ -15,6 +15,7 @@ import (
 	auditRepo "github.com/masterfabric-go/masterfabric/internal/domain/audit/repository"
 	"github.com/masterfabric-go/masterfabric/internal/shared/authcontext"
 	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
+	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
 )
 
 type fakeRepository struct {
@@ -37,6 +38,9 @@ func (r *fakeAuditRepository) ListByUser(context.Context, uuid.UUID, int, int) (
 }
 func (r *fakeAuditRepository) ListByResource(context.Context, string, string, int, int) ([]*auditModel.AuditLog, int, error) {
 	return nil, 0, nil
+}
+func (r *fakeAuditRepository) ListByOrgPage(context.Context, uuid.UUID, *pagination.Cursor, int) ([]*auditModel.AuditLog, error) {
+	return r.logs, r.err
 }
 
 func (r *fakeRepository) GetWorkspace(context.Context, uuid.UUID) (*aiadminModel.Workspace, error) {
@@ -117,6 +121,28 @@ func TestWorkspacePreservesDeniedAuditOutcomeAndFailsClosedOnAuditErrors(t *test
 	service = NewService(&fakeRepository{}, &fakeAuditRepository{err: errors.New("audit unavailable")})
 	_, err = service.Workspace(context.Background(), adminActor(org, "*:read"))
 	testrequire.Error(t, err)
+}
+
+func TestAuditPageUsesTenantScopedCursorAndBoundedLookahead(t *testing.T) {
+	org := uuid.New()
+	first, second, third := time.Date(2026, 9, 5, 12, 0, 0, 0, time.UTC), time.Date(2026, 9, 5, 11, 59, 0, 0, time.UTC), time.Date(2026, 9, 5, 11, 58, 0, 0, time.UTC)
+	repository := &fakeAuditRepository{logs: []*auditModel.AuditLog{
+		{ID: uuid.New(), OrganizationID: org, Action: "one", ResourceType: "audit", ResourceID: "1", CreatedAt: first},
+		{ID: uuid.New(), OrganizationID: org, Action: "two", ResourceType: "audit", ResourceID: "2", CreatedAt: second},
+		{ID: uuid.New(), OrganizationID: org, Action: "three", ResourceType: "audit", ResourceID: "3", CreatedAt: third},
+	}}
+	service := NewService(&fakeRepository{}, repository)
+	page, err := service.AuditPage(context.Background(), adminActor(org, "audit:read"), nil, 2)
+	testrequire.NoError(t, err)
+	testrequire.Len(t, page.Events, 2)
+	testrequire.True(t, page.HasNextPage)
+	testrequire.NotEmpty(t, page.EndCursor)
+}
+
+func TestAuditPageRejectsUnboundedSize(t *testing.T) {
+	service := NewService(&fakeRepository{}, &fakeAuditRepository{})
+	_, err := service.AuditPage(context.Background(), adminActor(uuid.New(), "audit:read"), nil, 101)
+	testrequire.ErrorIs(t, err, domainErr.ErrValidation)
 }
 
 func TestMutationsUseTenantScopeAndManagePermission(t *testing.T) {

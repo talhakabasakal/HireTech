@@ -3,12 +3,14 @@ package audit
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/masterfabric-go/masterfabric/internal/domain/audit/model"
 	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
+	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
 )
 
 // AuditRepo implements repository.AuditRepository with PostgreSQL.
@@ -138,6 +140,30 @@ func (r *AuditRepo) ListByOrg(ctx context.Context, orgID uuid.UUID, offset, limi
 	defer rows.Close()
 
 	return r.scanLogs(rows, total)
+}
+
+// ListByOrgPage reads one bounded keyset page. Organization scope is part of
+// the storage predicate so a cursor can never widen the tenant boundary.
+func (r *AuditRepo) ListByOrgPage(ctx context.Context, orgID uuid.UUID, after *pagination.Cursor, limit int) ([]*model.AuditLog, error) {
+	if limit <= 0 {
+		return []*model.AuditLog{}, nil
+	}
+	query := `SELECT id, organization_id, app_id, endpoint_id, user_id, request_id, action, resource_type, resource_id, metadata, ip_address, user_agent, created_at
+		FROM audit_logs WHERE organization_id=$1`
+	args := []any{orgID}
+	if after != nil {
+		query += ` AND (created_at,id) < ($2,$3)`
+		args = append(args, after.CreatedAt, after.ID)
+	}
+	args = append(args, limit)
+	query += ` ORDER BY created_at DESC,id DESC LIMIT $` + strconv.Itoa(len(args))
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, domainErr.New(domainErr.ErrInternal, "failed to list audit log page", err)
+	}
+	defer rows.Close()
+	logs, _, err := r.scanLogs(rows, 0)
+	return logs, err
 }
 
 func (r *AuditRepo) ListByUser(ctx context.Context, userID uuid.UUID, offset, limit int) ([]*model.AuditLog, int, error) {

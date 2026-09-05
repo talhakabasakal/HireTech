@@ -4,6 +4,9 @@ import (
 	"context"
 	"log/slog"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
 )
 
 const (
@@ -24,10 +27,46 @@ type OutboxRelay struct {
 	logger   *slog.Logger
 	batch    int
 	interval time.Duration
+	metrics  relayMetrics
+}
+
+type relayMetrics struct {
+	batches  metric.Int64Counter
+	events   metric.Int64Counter
+	errors   metric.Int64Counter
+	duration metric.Float64Histogram
 }
 
 func NewOutboxRelay(repo OutboxRepository, logger *slog.Logger) *OutboxRelay {
-	return &OutboxRelay{repo: repo, logger: logger, batch: defaultBatchSize, interval: defaultInterval}
+	meter := otel.Meter("hiretech/audit")
+	return &OutboxRelay{
+		repo:     repo,
+		logger:   logger,
+		batch:    defaultBatchSize,
+		interval: defaultInterval,
+		metrics: relayMetrics{
+			batches:  newCounter(meter, "hiretech.audit.outbox.relay.batches", "Number of audit outbox relay attempts."),
+			events:   newCounter(meter, "hiretech.audit.outbox.relay.events", "Number of audit events projected by the relay."),
+			errors:   newCounter(meter, "hiretech.audit.outbox.relay.errors", "Number of failed audit outbox relay attempts."),
+			duration: newHistogram(meter, "hiretech.audit.outbox.relay.duration", "Audit outbox relay duration in seconds."),
+		},
+	}
+}
+
+func newCounter(meter metric.Meter, name, description string) metric.Int64Counter {
+	counter, err := meter.Int64Counter(name, metric.WithDescription(description))
+	if err != nil {
+		return nil
+	}
+	return counter
+}
+
+func newHistogram(meter metric.Meter, name, description string) metric.Float64Histogram {
+	histogram, err := meter.Float64Histogram(name, metric.WithDescription(description), metric.WithUnit("s"))
+	if err != nil {
+		return nil
+	}
+	return histogram
 }
 
 // RelayOnce drains one bounded batch. It is exposed for deterministic tests
@@ -36,7 +75,23 @@ func (r *OutboxRelay) RelayOnce(ctx context.Context) (int, error) {
 	if r == nil || r.repo == nil {
 		return 0, nil
 	}
-	return r.repo.RelayPending(ctx, r.batch)
+	started := time.Now()
+	if r.metrics.batches != nil {
+		r.metrics.batches.Add(ctx, 1)
+	}
+
+	count, err := r.repo.RelayPending(ctx, r.batch)
+	if err != nil {
+		if r.metrics.errors != nil {
+			r.metrics.errors.Add(ctx, 1)
+		}
+	} else if r.metrics.events != nil && count > 0 {
+		r.metrics.events.Add(ctx, int64(count))
+	}
+	if r.metrics.duration != nil {
+		r.metrics.duration.Record(ctx, time.Since(started).Seconds())
+	}
+	return count, err
 }
 
 // Run starts the small in-process relay loop and exits with ctx.

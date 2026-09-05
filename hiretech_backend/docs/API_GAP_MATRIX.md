@@ -138,13 +138,13 @@ The mappings below show which existing use cases may be reused. They do not auth
 | Evaluation data | Scores, rationale, confidence, review notes | None | Explainability, evidence links, review gate, bias monitoring, restricted access |
 | LLM payload | Prompt, context, output, usage | None | Data minimization, provider policy, residency, no-training contract, redaction, bounded retention |
 | Admin configuration | Prompts, models, rubrics, routing | None | Versioning, dual control, secret references, rollout/rollback, complete audit |
-| Audit data | Actor/action/resource/IP metadata; transactional outbox writes and bounded idempotent relay | Immutable policy, restricted reads, integrity and retention controls; add relay monitoring, retention, and integrity verification |
+| Audit data | Actor/action/resource/IP metadata; transactional outbox writes, bounded idempotent relay, and relay batch/event/error/latency metrics | Immutable policy, restricted reads, integrity and retention controls; add retention and integrity verification |
 
 ## 9. Remaining implementation dependencies and critical path
 
 ```text
 Migrated PostgreSQL/Redis integration validation with managed JWT keys
-  -> monitored audit relay and complete admin audit lifecycle
+  -> audit relay alerting/retention and complete admin audit lifecycle
   -> real interviewer/evaluator model artifacts and quality/latency evidence
   -> subscription authorization and persisted-operation allowlist
   -> separately reviewed code-execution sandbox

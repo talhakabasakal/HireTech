@@ -108,9 +108,11 @@ Required validation commands:
 
 - Audit mutations populate the outbox transactionally, and the server now runs a bounded in-process relay that projects pending rows idempotently into `audit_logs`. A separately monitored worker remains recommended for high-volume production deployments.
 - Admin configuration versions, transactional admin lifecycle events, and the
-  generic request audit projection are available. Monitored relay metrics,
-  paginated audit connections, and a separately operated high-volume worker
-  remain production hardening work.
+  generic request audit projection are available. The bounded relay now emits
+  batch, projected-event, failure, and duration metrics through the existing
+  OpenTelemetry/Prometheus pipeline. Paginated audit connections, retention,
+  integrity verification, and a separately operated high-volume worker remain
+  production hardening work.
 - GraphQL subscriptions remain deferred. Persisted-operation hash allowlisting
   is implemented behind `GRAPHQL_REQUIRE_PERSISTED_OPERATIONS`; keep it
   disabled until `GRAPHQL_ALLOWED_OPERATION_HASHES` contains the reviewed

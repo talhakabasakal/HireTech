@@ -15,6 +15,7 @@
     "build:web": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "preelectron": "node electron/write-runtime-config.cjs",
     "electron": "electron electron/main.cjs",
     "electron:dev": "npm run dev:desktop",

@@ -110,9 +110,15 @@ From the frontend directory:
 
 ```bash
 npm run lint
-npx tsc --noEmit
+npm run typecheck
 npm run build
 ```
+
+`npm run typecheck` is intentionally separate from the Next.js build so a
+source-level TypeScript contract failure is visible without relying on build
+output. The web build is the deployment artifact validation; Electron
+installer generation remains platform-specific and must be run on an
+authorized release environment.
 
 From the backend directory:
 

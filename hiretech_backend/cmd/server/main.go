@@ -254,6 +254,7 @@ func buildDependencies(
 	deps.RBACService = rbacService
 	deps.OrgRepo = orgRepo
 	deps.WorkspaceRepo = workspaceRepo
+	deps.AppRepo = appRepo
 	deps.AuditRepo = auditRepo
 	var securityLimiter iamUC.RateLimiter = iamUC.NewMemoryRateLimiter()
 	if redisClient != nil {
@@ -302,7 +303,7 @@ func buildDependencies(
 	questionDraftService := interviewUC.NewQuestionDraftService(interviewRepo, interviewRepo, runtimeGateway)
 	evaluationService := evaluationUC.NewEvaluationService(evaluationRepo, interviewRepo, runtimeGateway)
 	aiadminService := aiadminUC.NewService(aiadminRepo, auditRepo, cfg.Security)
-	assignRoleUC := iamUC.NewAssignRoleUseCase(roleRepo, rbacService, eventBus)
+	assignRoleUC := iamUC.NewAssignRoleUseCase(roleRepo, orgUserRepo, appRepo, rbacService, eventBus)
 	createOrgUC := tenantUC.NewCreateOrgUseCase(orgRepo, eventBus)
 	createWorkspaceUC := tenantUC.NewCreateWorkspaceUseCase(workspaceRepo, orgRepo, eventBus)
 	listWorkspacesUC := tenantUC.NewListWorkspacesUseCase(workspaceRepo)

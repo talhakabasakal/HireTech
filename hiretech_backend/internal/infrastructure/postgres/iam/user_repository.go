@@ -74,8 +74,8 @@ func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*model.User, e
 func (r *UserRepo) Update(ctx context.Context, user *model.User) error {
 	user.UpdatedAt = time.Now().UTC()
 	_, err := r.db.Exec(ctx,
-		`UPDATE users SET email=$1, first_name=$2, last_name=$3, status=$4, updated_at=$5 WHERE id=$6`,
-		user.Email, user.FirstName, user.LastName, user.Status, user.UpdatedAt, user.ID,
+		`UPDATE users SET email=$1, password_hash=$2, first_name=$3, last_name=$4, status=$5, updated_at=$6 WHERE id=$7`,
+		user.Email, user.PasswordHash, user.FirstName, user.LastName, user.Status, user.UpdatedAt, user.ID,
 	)
 	if err != nil {
 		return domainErr.New(domainErr.ErrInternal, "failed to update user", err)

@@ -62,10 +62,11 @@ URL before development or packaging. Staging and production builds should
 use `NEXT_PUBLIC_DATA_MODE=api` and an HTTPS `NEXT_PUBLIC_API_URL`.
 `HIRETECH_RENDERER_URL` is a
 main-process-only development override and must remain a loopback URL.
-The packaged renderer uses port `3210`; include both
-`http://localhost:3000` and `http://127.0.0.1:3210` in the backend
-`CORS_ALLOWED_ORIGINS` value. A custom `HIRETECH_DESKTOP_PORT` must be reflected
-in that allowlist.
+The packaged renderer uses port `3210`; include
+`http://localhost:3000,http://127.0.0.1:3000,http://localhost:3210,http://127.0.0.1:3210`
+in the backend `CORS_ALLOWED_ORIGINS` value. The root `dev.sh` adds a custom
+`HIRETECH_DESKTOP_PORT` to its default allowlist; separately managed backends
+must be updated manually.
 
 Electron packages only the frontend and its required Next.js runtime. The Go
 backend and both QLoRA model services remain separate server processes and are

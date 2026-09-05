@@ -1,4 +1,4 @@
-import type { AuthRepository, LoginInput, RegisterInput, VerificationInput } from "@/core/ports/repositories";
+import type { AuthRepository, LoginInput, PasswordResetInput, RegisterInput, VerificationInput } from "@/core/ports/repositories";
 
 export class Login {
   constructor(private readonly repository: AuthRepository) {}
@@ -25,8 +25,12 @@ export class RequestPasswordReset {
   execute(email: string) { return this.repository.requestPasswordReset(email); }
 }
 
+export class ResetPassword {
+  constructor(private readonly repository: AuthRepository) {}
+  execute(input: PasswordResetInput) { return this.repository.resetPassword(input); }
+}
+
 export class RecoverExpiredSession {
   constructor(private readonly repository: AuthRepository) {}
   execute() { return this.repository.recoverSession(); }
 }
-

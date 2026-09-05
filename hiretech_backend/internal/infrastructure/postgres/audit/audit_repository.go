@@ -75,6 +75,24 @@ func (r *AuditRepo) ListByUser(ctx context.Context, userID uuid.UUID, offset, li
 	return r.scanLogs(rows, total)
 }
 
+func (r *AuditRepo) ListByUserInOrg(ctx context.Context, orgID, userID uuid.UUID, offset, limit int) ([]*model.AuditLog, int, error) {
+	var total int
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM audit_logs WHERE organization_id=$1 AND user_id=$2`, orgID, userID).Scan(&total); err != nil {
+		return nil, 0, domainErr.New(domainErr.ErrInternal, "failed to count audit logs", err)
+	}
+
+	rows, err := r.db.Query(ctx,
+		`SELECT id, organization_id, app_id, endpoint_id, user_id, request_id, action, resource_type, resource_id, metadata, ip_address, user_agent, created_at
+		 FROM audit_logs WHERE organization_id=$1 AND user_id=$2 ORDER BY created_at DESC LIMIT $3 OFFSET $4`, orgID, userID, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, domainErr.New(domainErr.ErrInternal, "failed to list audit logs", err)
+	}
+	defer rows.Close()
+
+	return r.scanLogs(rows, total)
+}
+
 func (r *AuditRepo) ListByResource(ctx context.Context, resourceType, resourceID string, offset, limit int) ([]*model.AuditLog, int, error) {
 	var total int
 	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM audit_logs WHERE resource_type=$1 AND resource_id=$2`, resourceType, resourceID).Scan(&total); err != nil {

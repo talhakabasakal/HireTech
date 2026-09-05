@@ -14,3 +14,9 @@ type AuditRepository interface {
 	ListByUser(ctx context.Context, userID uuid.UUID, offset, limit int) ([]*model.AuditLog, int, error)
 	ListByResource(ctx context.Context, resourceType, resourceID string, offset, limit int) ([]*model.AuditLog, int, error)
 }
+
+// OrganizationScopedUserAuditRepository is the safe form of user audit reads.
+// Implementations must apply the organization predicate in storage.
+type OrganizationScopedUserAuditRepository interface {
+	ListByUserInOrg(ctx context.Context, orgID, userID uuid.UUID, offset, limit int) ([]*model.AuditLog, int, error)
+}

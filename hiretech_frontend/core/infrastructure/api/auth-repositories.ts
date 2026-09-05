@@ -1,4 +1,4 @@
-import type { AuthRepository, DeviceRepository, LoginInput, RegisterInput, VerificationInput } from "@/core/ports/repositories";
+import type { AuthRepository, DeviceRepository, LoginInput, PasswordResetInput, RegisterInput, VerificationInput } from "@/core/ports/repositories";
 import type { AuthSession, Device, User, UserRole } from "@/core/domain/identity";
 import { apiRequest } from "@/core/infrastructure/api/http-client";
 import { graphqlRequest } from "@/core/infrastructure/graphql/client";
@@ -94,6 +94,13 @@ export class ApiAuthRepository implements AuthRepository {
   }
 
   async requestPasswordReset(email: string) { return this.requestOtp(email); }
+
+  async resetPassword(input: PasswordResetInput) {
+    return apiRequest<{ message: string }>("/api/v1/auth/password/reset", {
+      method: "POST",
+      body: JSON.stringify({ email: input.email, code: input.code, new_password: input.newPassword }),
+    });
+  }
 
   async recoverSession() {
     await clearSessionTokens();

@@ -14,6 +14,11 @@ type OTPVerifyRequest struct {
 	Code       string `json:"code" validate:"required,len=6,numeric"`
 	DeviceName string `json:"device_name"`
 }
+type PasswordResetRequest struct {
+	Email       string `json:"email" validate:"required,email"`
+	Code        string `json:"code" validate:"required,len=6,numeric"`
+	NewPassword string `json:"new_password" validate:"required,min=8"`
+}
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
 }

@@ -22,6 +22,12 @@ export class MockAuthRepository implements AuthRepository {
   }
   async requestOtp(email: string) { await wait(); return { message: `Verification code sent to ${email}.` }; }
   async requestPasswordReset(email: string) { await wait(); return { message: `If ${email} is registered, a reset link has been sent.` }; }
+  async resetPassword(input: { email: string; code: string; newPassword: string }) {
+    await wait();
+    if (input.code !== MOCK_OTP_CODE) throw new ApplicationError("That code is not valid. For this mock, use 123456.", "INVALID_OTP");
+    if (input.newPassword.length < 8) throw new ApplicationError("Password must contain at least 8 characters.", "VALIDATION_ERROR");
+    return { message: "Your password has been reset." };
+  }
   async recoverSession() { await wait(); return { message: "Your session has been refreshed. You can sign in again." }; }
 }
 
@@ -118,7 +124,7 @@ export class MockRecruiterRepository implements RecruiterRepository {
     this.hydrate();
     const interview = clone({
       ...activeInterview,
-      id: "int_new_demo",
+      id: `int_new_demo_${Date.now()}`,
       title: input.title,
       candidateAlias: input.candidateDisplayName,
       durationMinutes: input.durationMinutes,
@@ -240,15 +246,30 @@ export class MockRecruiterRepository implements RecruiterRepository {
 
 export class MockAdminRepository implements AdminRepository {
   private workspace = clone(adminWorkspace);
-  async getWorkspace() { await wait(); return clone(this.workspace); }
-  async registerModel(input: Parameters<AdminRepository["registerModel"]>[0]) { await wait(); const item = { id: `model_${Date.now()}`, ...input }; this.workspace.models.push(item); return clone(item); }
-  async createPromptVersion(input: Parameters<AdminRepository["createPromptVersion"]>[0]) { await wait(); const item = { id: `prompt_${Date.now()}`, ...input, version: 2, status: "draft" as const, updatedAt: new Date().toISOString(), updatedBy: "demo-admin" }; this.workspace.prompts.unshift(item); return clone(item); }
-  async updateRouting(input: Parameters<AdminRepository["updateRouting"]>[0]) { await wait(); const existing = this.workspace.routing.find((item) => item.role === input.role); const item = { id: existing?.id ?? `routing_${Date.now()}`, ...input }; if (existing) Object.assign(existing, item); else this.workspace.routing.push(item); return clone(item); }
-  async publishRubric(input: Parameters<AdminRepository["publishRubric"]>[0]) { await wait(); const item = { id: `rubric_${Date.now()}`, ...input, version: this.workspace.rubric?.version ? this.workspace.rubric.version + 1 : 1, status: "active" as const }; this.workspace.rubric = item; return clone(item); }
+  private hydrated = false;
+  private hydrate() {
+    if (this.hydrated || typeof window === "undefined") return;
+    const stored = readMockState<typeof adminWorkspace>("admin");
+    if (stored) this.workspace = clone(stored);
+    this.hydrated = true;
+  }
+  private persist() { writeMockState("admin", this.workspace); }
+  async getWorkspace() { await wait(); this.hydrate(); return clone(this.workspace); }
+  async registerModel(input: Parameters<AdminRepository["registerModel"]>[0]) { await wait(); this.hydrate(); const item = { id: `model_${Date.now()}`, ...input }; this.workspace.models.push(item); this.persist(); return clone(item); }
+  async createPromptVersion(input: Parameters<AdminRepository["createPromptVersion"]>[0]) { await wait(); this.hydrate(); const item = { id: `prompt_${Date.now()}`, ...input, version: 2, status: "draft" as const, updatedAt: new Date().toISOString(), updatedBy: "demo-admin" }; this.workspace.prompts.unshift(item); this.persist(); return clone(item); }
+  async updateRouting(input: Parameters<AdminRepository["updateRouting"]>[0]) { await wait(); this.hydrate(); const existing = this.workspace.routing.find((item) => item.role === input.role); const item = { id: existing?.id ?? `routing_${Date.now()}`, ...input }; if (existing) Object.assign(existing, item); else this.workspace.routing.push(item); this.persist(); return clone(item); }
+  async publishRubric(input: Parameters<AdminRepository["publishRubric"]>[0]) { await wait(); this.hydrate(); const item = { id: `rubric_${Date.now()}`, ...input, version: this.workspace.rubric?.version ? this.workspace.rubric.version + 1 : 1, status: "active" as const }; this.workspace.rubric = item; this.persist(); return clone(item); }
 }
 
 export class MockDeviceRepository implements DeviceRepository {
   private records = clone(devices);
-  async list() { await wait(); return clone(this.records); }
-  async revoke(id: string) { await wait(); this.records = this.records.filter((device) => device.id !== id); return { message: "Device access revoked." }; }
+  private hydrated = false;
+  private hydrate() {
+    if (this.hydrated || typeof window === "undefined") return;
+    const stored = readMockState<typeof devices>("devices");
+    if (stored) this.records = clone(stored);
+    this.hydrated = true;
+  }
+  async list() { await wait(); this.hydrate(); return clone(this.records); }
+  async revoke(id: string) { await wait(); this.hydrate(); this.records = this.records.filter((device) => device.id !== id); writeMockState("devices", this.records); return { message: "Device access revoked." }; }
 }

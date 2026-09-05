@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	tenantRepo "github.com/masterfabric-go/masterfabric/internal/domain/tenant/repository"
 	"github.com/masterfabric-go/masterfabric/internal/shared/logger"
@@ -18,7 +19,7 @@ const (
 )
 
 // TenantResolver resolves the tenant (organization) and optionally workspace from the request.
-// Resolution order: X-Organization-ID header > JWT claims > subdomain.
+// Resolution order: authenticated JWT claims > matching X-Organization-ID header > subdomain.
 // Workspace resolution: X-Workspace-ID header > X-Workspace-Slug header (requires org context).
 func TenantResolver(orgRepo tenantRepo.OrgRepository) func(http.Handler) http.Handler {
 	return TenantResolverWithWorkspace(orgRepo, nil)
@@ -30,12 +31,17 @@ func TenantResolverWithWorkspace(orgRepo tenantRepo.OrgRepository, workspaceRepo
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			var orgID uuid.UUID
+			claimOrgID, hasClaimOrgID := ctx.Value(ContextKeyOrganizationID).(uuid.UUID)
 
 			// 1. Check explicit header
 			if header := r.Header.Get("X-Organization-ID"); header != "" {
 				parsed, err := uuid.Parse(header)
 				if err != nil {
 					response.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid X-Organization-ID"})
+					return
+				}
+				if hasClaimOrgID && claimOrgID != uuid.Nil && parsed != claimOrgID {
+					response.JSON(w, http.StatusForbidden, map[string]string{"error": "organization does not match authenticated session"})
 					return
 				}
 				orgID = parsed
@@ -94,6 +100,49 @@ func TenantResolverWithWorkspace(orgRepo tenantRepo.OrgRepository, workspaceRepo
 			}
 
 			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// RequireOrganizationPath prevents a resource path from selecting a tenant
+// different from the authenticated tenant context.
+func RequireOrganizationPath(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pathOrgID, err := uuid.Parse(chi.URLParam(r, "orgId"))
+		if err != nil {
+			response.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid organization id"})
+			return
+		}
+		orgID, ok := TenantIDFromContext(r.Context())
+		if !ok || orgID != pathOrgID {
+			response.JSON(w, http.StatusForbidden, map[string]string{"error": "organization scope mismatch"})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// RequireAppOrganization verifies that an app path belongs to the resolved
+// organization before any nested app resource is accessed.
+func RequireAppOrganization(apps tenantRepo.AppRepository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			appID, err := uuid.Parse(chi.URLParam(r, "appId"))
+			if err != nil {
+				response.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid app id"})
+				return
+			}
+			orgID, ok := TenantIDFromContext(r.Context())
+			if !ok || apps == nil {
+				response.JSON(w, http.StatusForbidden, map[string]string{"error": "app scope unavailable"})
+				return
+			}
+			app, err := apps.GetByID(r.Context(), appID)
+			if err != nil || app == nil || app.OrganizationID != orgID {
+				response.JSON(w, http.StatusNotFound, map[string]string{"error": "app not found"})
+				return
+			}
+			next.ServeHTTP(w, r)
 		})
 	}
 }

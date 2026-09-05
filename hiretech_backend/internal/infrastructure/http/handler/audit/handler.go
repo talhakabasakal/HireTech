@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/masterfabric-go/masterfabric/internal/domain/audit/repository"
+	"github.com/masterfabric-go/masterfabric/internal/shared/middleware"
 	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
 	"github.com/masterfabric-go/masterfabric/internal/shared/response"
 )
@@ -40,6 +41,11 @@ func (h *Handler) ListByOrg(w http.ResponseWriter, r *http.Request) {
 
 // ListByUser returns audit logs for a user.
 func (h *Handler) ListByUser(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := middleware.TenantIDFromContext(r.Context())
+	if !ok {
+		response.JSON(w, http.StatusForbidden, map[string]string{"error": "organization scope required"})
+		return
+	}
 	userID, err := uuid.Parse(chi.URLParam(r, "userId"))
 	if err != nil {
 		response.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
@@ -47,7 +53,12 @@ func (h *Handler) ListByUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := pagination.FromRequest(r)
-	logs, total, err := h.auditRepo.ListByUser(r.Context(), userID, params.Offset(), params.Limit())
+	scopedRepo, ok := h.auditRepo.(repository.OrganizationScopedUserAuditRepository)
+	if !ok {
+		response.JSON(w, http.StatusServiceUnavailable, map[string]string{"error": "organization-scoped audit access unavailable"})
+		return
+	}
+	logs, total, err := scopedRepo.ListByUserInOrg(r.Context(), orgID, userID, params.Offset(), params.Limit())
 	if err != nil {
 		response.Error(w, err)
 		return

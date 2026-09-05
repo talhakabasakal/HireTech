@@ -206,6 +206,23 @@ func (h *Handler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusOK, dto.SecurityTokenResponse{AccessToken: pair.AccessToken, RefreshToken: pair.RefreshToken, SessionID: pair.SessionID, DeviceID: pair.DeviceID})
 }
 
+func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req dto.PasswordResetRequest
+	if err := validator.DecodeAndValidate(r, &req); err != nil {
+		response.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
+		return
+	}
+	if h.securityUC == nil {
+		response.Error(w, domainErr.New(domainErr.ErrInternal, "password reset unavailable", nil))
+		return
+	}
+	if err := h.securityUC.ResetPassword(r.Context(), req.Email, req.Code, req.NewPassword); err != nil {
+		response.Error(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, map[string]string{"message": "password reset successfully"})
+}
+
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	var req dto.RefreshRequest
 	if err := validator.DecodeAndValidate(r, &req); err != nil {

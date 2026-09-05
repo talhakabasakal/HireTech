@@ -59,6 +59,12 @@ func TestExistingRESTRoutesRemainAvailableAlongsideGraphQLWiring(t *testing.T) {
 	assert.Equal(t, http.StatusOK, authorized.Code)
 	assert.Contains(t, authorized.Body.String(), "rest@example.com")
 
+	protectedWithoutRBAC := httptest.NewRecorder()
+	protectedRequest := httptest.NewRequest(http.MethodGet, "/api/v1/users/", nil)
+	protectedRequest.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(protectedWithoutRBAC, protectedRequest)
+	assert.Equal(t, http.StatusServiceUnavailable, protectedWithoutRBAC.Code)
+
 	health := httptest.NewRecorder()
 	r.ServeHTTP(health, httptest.NewRequest(http.MethodGet, "/health/live", nil))
 	assert.Equal(t, http.StatusOK, health.Code)

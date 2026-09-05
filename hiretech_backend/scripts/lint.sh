@@ -22,7 +22,7 @@ echo "🔍 Running linters..."
 
 # Format check
 echo "  📝 Checking formatting..."
-if ! gofmt -l . | grep -q .; then
+if gofmt -l . | grep -q .; then
     if [[ "$FIX" == true ]]; then
         echo "    Fixing formatting..."
         gofmt -w .

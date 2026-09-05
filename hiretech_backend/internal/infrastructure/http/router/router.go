@@ -26,6 +26,7 @@ import (
 	"github.com/masterfabric-go/masterfabric/internal/gateway"
 	graphqlInfra "github.com/masterfabric-go/masterfabric/internal/infrastructure/graphql"
 	"github.com/masterfabric-go/masterfabric/internal/shared/middleware"
+	"github.com/masterfabric-go/masterfabric/internal/shared/response"
 
 	// Repositories (for tenant resolver middleware)
 	tenantRepo "github.com/masterfabric-go/masterfabric/internal/domain/tenant/repository"
@@ -33,7 +34,11 @@ import (
 
 func maybeRequirePermission(rbac iamService.RBACService, permission string) func(http.Handler) http.Handler {
 	if rbac == nil {
-		return func(next http.Handler) http.Handler { return next }
+		return func(_ http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				response.JSON(w, http.StatusServiceUnavailable, map[string]string{"error": "authorization service unavailable"})
+			})
+		}
 	}
 	return middleware.RequirePermission(rbac, permission)
 }
@@ -67,6 +72,7 @@ type Dependencies struct {
 	OrgRepo       tenantRepo.OrgRepository
 	AuditRepo     auditRepository.AuditRepository
 	WorkspaceRepo tenantRepo.WorkspaceRepository
+	AppRepo       tenantRepo.AppRepository
 }
 
 // New creates the root Chi router with all middleware and routes.
@@ -106,6 +112,7 @@ func New(deps Dependencies) *chi.Mux {
 				r.Post("/login", deps.IAMHandler.Login)
 				r.Post("/otp/request", deps.IAMHandler.RequestOTP)
 				r.Post("/otp/verify", deps.IAMHandler.VerifyOTP)
+				r.Post("/password/reset", deps.IAMHandler.ResetPassword)
 				r.Post("/refresh", deps.IAMHandler.Refresh)
 			}
 		})
@@ -157,6 +164,7 @@ func New(deps Dependencies) *chi.Mux {
 					r.With(maybeRequirePermission(deps.RBACService, "org:write")).Post("/", deps.TenantHandler.CreateOrg)
 					r.With(maybeRequirePermission(deps.RBACService, "org:read")).Get("/", deps.TenantHandler.ListOrgs)
 					r.Route("/{orgId}", func(r chi.Router) {
+						r.Use(middleware.RequireOrganizationPath)
 						r.With(maybeRequirePermission(deps.RBACService, "org:read")).Get("/", deps.TenantHandler.GetOrg)
 
 						// Apps under organization
@@ -164,6 +172,7 @@ func New(deps Dependencies) *chi.Mux {
 							r.With(maybeRequirePermission(deps.RBACService, "app:write")).Post("/", deps.TenantHandler.CreateApp)
 							r.With(maybeRequirePermission(deps.RBACService, "app:read")).Get("/", deps.TenantHandler.ListApps)
 							r.Route("/{appId}", func(r chi.Router) {
+								r.Use(middleware.RequireAppOrganization(deps.AppRepo))
 								r.With(maybeRequirePermission(deps.RBACService, "app:read")).Get("/", deps.TenantHandler.GetApp)
 
 								// API keys under app

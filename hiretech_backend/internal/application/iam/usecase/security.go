@@ -35,6 +35,7 @@ const (
 	AuditLogoutAll              = "logout.all"
 	AuditDeviceRegistered       = "device.registered"
 	AuditDeviceRevoked          = "device.revoked"
+	AuditPasswordReset          = "password.reset"
 	AuditRecentAuthFailed       = "recent_auth.failed"
 	AuditSecuritySettingChanged = "security_setting.changed"
 )
@@ -244,6 +245,70 @@ func (s *SecurityService) VerifyOTP(ctx context.Context, email, code, deviceName
 	s.record(ctx, AuditOTPSucceeded, "SUCCESS", challenge.UserID)
 	s.record(ctx, AuditDeviceRegistered, "SUCCESS", challenge.UserID)
 	return pair, nil
+}
+
+// ResetPassword verifies the one-time code issued by RequestOTP and replaces
+// the user's password. The challenge is consumed before the password update so
+// the same code cannot be reused.
+func (s *SecurityService) ResetPassword(ctx context.Context, email, code, newPassword string) error {
+	email = normalizeEmail(email)
+	newPassword = strings.TrimSpace(newPassword)
+	if len(newPassword) < 8 {
+		return domainErr.New(domainErr.ErrValidation, "password must contain at least 8 characters", nil)
+	}
+	if s.rate != nil {
+		allowed, err := s.rate.Allow(ctx, "otp:verify:"+email, s.cfg.OTPVerificationsPerHour, time.Hour)
+		if err != nil {
+			return domainErr.New(domainErr.ErrInternal, "password reset failed", err)
+		}
+		if !allowed {
+			return domainErr.New(domainErr.ErrRateLimited, "verification limit exceeded", nil)
+		}
+	}
+	challenge, err := s.otpRepo.GetActiveByEmail(ctx, email, s.now())
+	if err != nil || challenge == nil || challenge.IsUsed() || challenge.UserID == uuid.Nil {
+		return domainErr.New(domainErr.ErrOTPInvalid, "invalid or expired verification code", nil)
+	}
+	if challenge.IsExpired(s.now()) {
+		return domainErr.New(domainErr.ErrOTPExpired, "invalid or expired verification code", nil)
+	}
+	if challenge.Attempts >= challenge.MaxAttempts {
+		return domainErr.New(domainErr.ErrOTPAttemptsExceeded, "invalid or expired verification code", nil)
+	}
+	if !constantTimeEqual(iamService.HashOTP(s.secret, strings.TrimSpace(code)), challenge.CodeHash) {
+		attempts, incErr := s.otpRepo.IncrementAttempts(ctx, challenge.ID, challenge.MaxAttempts)
+		if incErr != nil {
+			return domainErr.New(domainErr.ErrInternal, "password reset failed", incErr)
+		}
+		if attempts >= challenge.MaxAttempts {
+			return domainErr.New(domainErr.ErrOTPAttemptsExceeded, "invalid or expired verification code", nil)
+		}
+		return domainErr.New(domainErr.ErrOTPInvalid, "invalid or expired verification code", nil)
+	}
+	consumed, err := s.otpRepo.Consume(ctx, challenge.ID, challenge.CodeHash, s.now())
+	if err != nil {
+		return domainErr.New(domainErr.ErrInternal, "password reset failed", err)
+	}
+	if !consumed {
+		return domainErr.New(domainErr.ErrOTPInvalid, "invalid or expired verification code", nil)
+	}
+	user, err := s.users.GetByID(ctx, challenge.UserID)
+	if err != nil || user == nil {
+		return domainErr.New(domainErr.ErrOTPInvalid, "invalid or expired verification code", nil)
+	}
+	hash, err := s.auth.HashPassword(newPassword)
+	if err != nil {
+		return domainErr.New(domainErr.ErrInternal, "failed to hash password", err)
+	}
+	user.PasswordHash = hash
+	if err := s.users.Update(ctx, user); err != nil {
+		return domainErr.New(domainErr.ErrInternal, "failed to update password", err)
+	}
+	if s.sessions != nil {
+		_ = s.sessions.RevokeAllByUser(ctx, user.ID, s.now())
+	}
+	s.record(ctx, AuditPasswordReset, "SUCCESS", user.ID)
+	return nil
 }
 
 func constantTimeEqual(a, b string) bool {

@@ -7,6 +7,7 @@ import type { AddManagedQuestionInput, CandidateAnswer, CandidateAnswerSubmissio
 export interface LoginInput { email: string; password: string }
 export interface RegisterInput { name: string; email: string; password: string }
 export interface VerificationInput { email: string; code: string }
+export interface PasswordResetInput { email: string; code: string; newPassword: string }
 
 export interface AuthRepository {
   login(input: LoginInput): Promise<AuthSession>;
@@ -14,6 +15,7 @@ export interface AuthRepository {
   verifyOtp(input: VerificationInput): Promise<AuthSession>;
   requestOtp(email: string): Promise<ApplicationResult>;
   requestPasswordReset(email: string): Promise<ApplicationResult>;
+  resetPassword(input: PasswordResetInput): Promise<ApplicationResult>;
   recoverSession(): Promise<ApplicationResult>;
 }
 

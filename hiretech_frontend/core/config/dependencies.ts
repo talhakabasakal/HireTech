@@ -1,5 +1,5 @@
 import { AddInterviewQuestion, ApproveInterviewQuestionDraft, CancelInterview, CreateAdminPromptVersion, CreateInterview, CreateInterviewInvitation, GetAdminWorkspace, GetCandidateWorkspace, GetDevices, GetEvaluationReport, GetInterviewQuestionDraft, GetInterviewWorkspace, GetRecruiterInterview, GetRecruiterWorkspace, PublishAdminRubric, PublishInterview, RedeemCandidateInvitation, RegisterAdminModel, RejectInterviewQuestionDraft, RequestEvaluation, RequestInterviewQuestionDraft, RevokeDevice, SaveCandidateAnswer, SubmitCandidateFeedback, SubmitHumanReview, UpdateAdminRouting } from "@/core/application/workspaces";
-import { Login, RecoverExpiredSession, Register, RequestOtp, RequestPasswordReset, VerifyOtp } from "@/core/application/auth";
+import { Login, RecoverExpiredSession, Register, RequestOtp, RequestPasswordReset, ResetPassword, VerifyOtp } from "@/core/application/auth";
 import { ApiAuthRepository, ApiDeviceRepository } from "@/core/infrastructure/api/auth-repositories";
 import { ApiRecruiterRepository } from "@/core/infrastructure/graphql/recruiter-repository";
 import { ApiCandidateInvitationRepository } from "@/core/infrastructure/graphql/candidate-invitation-repository";
@@ -22,6 +22,7 @@ export const dependencies = {
     verifyOtp: new VerifyOtp(authRepository),
     requestOtp: new RequestOtp(authRepository),
     requestPasswordReset: new RequestPasswordReset(authRepository),
+    resetPassword: new ResetPassword(authRepository),
     recoverExpiredSession: new RecoverExpiredSession(authRepository),
   },
   candidate: {

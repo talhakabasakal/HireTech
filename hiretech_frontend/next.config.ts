@@ -33,11 +33,14 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
-  // Next 16.3's experimental CLI typecheck path emits non-JSON output for
-  // this project during `next build`; keep the supported TypeScript API path
-  // until that Next/TypeScript combination is stable.
+  // `npm run build:web` runs the repository's explicit typecheck first. Keep
+  // Next's duplicate build-time check disabled for this project. The API path
+  // avoids the Next 16.3 CLI --showConfig parser incompatibility with TS 5.9.
   experimental: {
     useTypeScriptCli: false,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
   },
   async headers() {
     return [{

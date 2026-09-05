@@ -19,6 +19,11 @@ The configured runner uses an installed Chrome channel and loopback port
 must provide a supported Chrome installation or replace the channel with its
 approved browser artifact.
 
+The first navigation to a development-only route may compile that route on
+demand. The smoke test starts its navigation wait together with the click and
+uses a bounded 15-second timeout for that transition; it does not use arbitrary
+sleeps.
+
 This smoke test does not prove backend authorization, PostgreSQL migrations,
 real email delivery, production model serving, WebSocket subscriptions, or
 Electron installer signing. Those remain separate release gates.

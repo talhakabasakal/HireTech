@@ -48,8 +48,10 @@ or browser `sessionStorage`; no token is placed in a URL or log message.
 
 ## GraphQL transport
 
-The backend exposes a POST-only `/graphql` endpoint. Requests require
-`Authorization: Bearer <token>` and must not send `X-Organization-ID`,
+The backend exposes POST operations and `graphql-transport-ws` subscriptions
+on `/graphql`. HTTP requests require `Authorization: Bearer <token>`; WebSocket
+connections send the same GraphQL-audience token in the `connection_init`
+payload. Neither transport may send `X-Organization-ID`,
 `X-Workspace-ID`, or `X-App-ID`; the backend rejects those headers. Introspection,
 aliases, batches, excessive depth, and oversized operations are rejected by the
 backend limits layer.
@@ -68,6 +70,7 @@ The current schema supports these frontend operation groups:
   `recordHumanReview`
 - AI administration: `adminWorkspace`, `registerAdminModel`,
   `createAdminPromptVersion`, `updateAdminRouting`, and `publishAdminRubric`
+- interview lifecycle subscription: `interviewUpdated(interviewId)`
 
 The backend still enforces token class, organization scope, and permission at
 the resolver/use-case boundary. The admin operations require a tenant token and
@@ -104,8 +107,8 @@ the schema's generated names (`competencyIds`, `timeLimitSeconds`,
 
 - Candidate feedback has no backend mutation in the current schema, so the API
   adapter returns `BACKEND_CONTRACT_MISSING` instead of pretending to save it.
-- The current GraphQL schema has no subscription transport; the existing
-  `/api/v1/ws` stream is not used as an interview chat protocol.
+- `interviewUpdated` carries lifecycle metadata only. It is not a chat stream,
+  has no durable reconnect cursor yet, and does not replace `/api/v1/ws`.
 - Model/provider credentials never enter the renderer. Model IDs and
   configuration are sent only to the protected admin GraphQL operations.
 - Mock repositories remain available for offline demos and do not represent
@@ -119,6 +122,7 @@ From the frontend directory:
 npm run lint
 npm run typecheck
 npm run build
+npm run test:e2e
 ```
 
 `npm run typecheck` is intentionally separate from the Next.js build so a
@@ -126,6 +130,11 @@ source-level TypeScript contract failure is visible without relying on build
 output. The web build is the deployment artifact validation; Electron
 installer generation remains platform-specific and must be run on an
 authorized release environment.
+
+The production build uses system font stacks and does not download Google
+Fonts. `npm run build` and `npm run build:web` run the explicit TypeScript
+check before Next.js because Next 16.3's internal CLI config parser is not
+compatible with the installed TypeScript 5.9 output.
 
 From the backend directory:
 

@@ -16,9 +16,10 @@ test("signs in through OTP and reaches the candidate invitation", async ({ page 
 
   await expect(page).toHaveURL(/\/candidate$/);
   await expect(page.getByRole("heading", { name: "Show us how you think." })).toBeVisible();
-  await page.getByRole("link", { name: "Enter candidate area", exact: true }).click();
-
-  await expect(page).toHaveURL(/\/candidate\/invitation$/);
+  await Promise.all([
+    page.waitForURL(/\/candidate\/invitation$/, { timeout: 15_000 }),
+    page.getByRole("link", { name: "Enter candidate area", exact: true }).click(),
+  ]);
   await expect(page.getByRole("heading", { name: "Your technical interview" })).toBeVisible();
   await expect(page.getByText("Demo mode — isolated UI data only.")).toBeVisible();
 });

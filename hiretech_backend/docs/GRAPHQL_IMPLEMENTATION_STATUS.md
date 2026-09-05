@@ -79,6 +79,13 @@ Migration `00015_create_evaluation_domain.sql` also adds `evaluation_jobs`, `eva
 
 All business mutations write their allowlisted audit event to `audit_outbox` in the same PostgreSQL transaction. Outbox payloads contain identifiers and transition metadata only; they do not contain invitation secrets, prompts, answer text, code, tokens, or LLM payloads.
 
+AI administration create, approve, and rollback transitions use the same
+transactional boundary and emit `ai_configuration.created`,
+`ai_configuration.approved`, or `ai_configuration.rolled_back`. The gated
+PostgreSQL lifecycle test also projects the committed outbox rows into
+`audit_logs` and verifies that a retry does not duplicate them or expose
+protected content.
+
 ## Security limits
 
 Existing GraphQL controls remain active: POST-only transport, GraphQL audience validation, server-side session/device validation, 1 MiB default request limit, 4,096 parser tokens, one operation, complexity 50, depth 8, nodes 64, no aliases, no batches, disabled introspection, five-second resolver timeout, sanitized errors, and synchronous request audit recording.
@@ -100,10 +107,10 @@ Required validation commands:
 ## Known limitations and production prerequisites
 
 - Audit mutations populate the outbox transactionally, and the server now runs a bounded in-process relay that projects pending rows idempotently into `audit_logs`. A separately monitored worker remains recommended for high-volume production deployments.
-- Admin configuration versions and the generic request audit projection are
-  available, but dedicated admin lifecycle events, approval/rollback actions,
-  paginated audit connections, and transactional coupling between an admin
-  write and its audit record are still production gaps.
+- Admin configuration versions, transactional admin lifecycle events, and the
+  generic request audit projection are available. Monitored relay metrics,
+  paginated audit connections, and a separately operated high-volume worker
+  remain production hardening work.
 - GraphQL subscriptions and persisted-operation allowlisting remain deferred.
 - Development/test may use HS256, but production startup now requires RS256 with a managed RSA private key, `kid`-indexed public keys, and explicit key configuration. Retain old public keys only for a bounded rotation overlap and remove them after token expiry.
 - Development startup tolerates unavailable PostgreSQL/Redis for local iteration; with `APP_ENV=production`, startup now fails closed when either required security dependency is unavailable.

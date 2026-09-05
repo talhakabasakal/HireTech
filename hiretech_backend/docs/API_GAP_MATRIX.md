@@ -73,7 +73,7 @@ The mappings below show which existing use cases may be reused. They do not auth
 | App/workspace routes | Not in initial product GraphQL schema | Preserve through REST | Add later only if frontend product needs these concepts |
 | API-key routes | No frontend operation | Preserve through restricted REST/admin tooling | Do not expose provider/API credentials through product GraphQL |
 | Managed endpoint routes | No frontend operation | Preserve as platform administration REST | Do not use dynamic endpoints as an interview data model |
-| Audit list routes | Future GraphQL audit connection | Repository can be extended | Wire writes, add event schema, redaction, tenant scope, and stronger permission |
+| Audit list routes | Future GraphQL audit connection | Transactional outbox writes, bounded relay, and tenant-scoped projection exist | Add a paginated GraphQL connection, redaction coverage, and stronger permission tests |
 | `/api/v1/ws` | `interviewUpdated`, `evaluationUpdated` | Event bus/hub concepts reusable | Add GraphQL subscription authorization and interview-specific events |
 
 ## 5. Product-domain gap matrix
@@ -123,7 +123,7 @@ The mappings below show which existing use cases may be reused. They do not auth
 | Device | None | Challenge issued, registered, trust elevated, signature failed, revoked, expired |
 | Interview | None | Created, published, invited, invitation redeemed, consent recorded, started, answer submitted, completed, cancelled |
 | Evaluation | `evaluation.report.created`, `evaluation.human_review.recorded` | Requested/completed, review recorded, report published/rejected |
-| LLM | None | Configuration drafted/validated/approved/activated/retired, invocation summary, route selected, fallback used, policy blocked |
+| LLM | Configuration create/approve/rollback lifecycle events are transactionally written to the audit outbox | Add invocation summary, route selected, fallback used, policy blocked, and activation/retirement event coverage |
 | Deletion | None | Requested, confirmed, sessions revoked, job started, store completed/failed, retention exception, completed/cancelled |
 | GraphQL access | Partial: synchronous request audit projection records operation, actor, tenant, duration, and safe outcome | Add dedicated attempted/completed/denied events plus operation cost fields |
 
@@ -138,7 +138,7 @@ The mappings below show which existing use cases may be reused. They do not auth
 | Evaluation data | Scores, rationale, confidence, review notes | None | Explainability, evidence links, review gate, bias monitoring, restricted access |
 | LLM payload | Prompt, context, output, usage | None | Data minimization, provider policy, residency, no-training contract, redaction, bounded retention |
 | Admin configuration | Prompts, models, rubrics, routing | None | Versioning, dual control, secret references, rollout/rollback, complete audit |
-| Audit data | Actor/action/resource/IP metadata; transactional outbox writes and bounded idempotent relay | Immutable policy, restricted reads, integrity and retention controls; add dedicated admin lifecycle events, retention, and integrity verification |
+| Audit data | Actor/action/resource/IP metadata; transactional outbox writes and bounded idempotent relay | Immutable policy, restricted reads, integrity and retention controls; add relay monitoring, retention, and integrity verification |
 
 ## 9. Remaining implementation dependencies and critical path
 

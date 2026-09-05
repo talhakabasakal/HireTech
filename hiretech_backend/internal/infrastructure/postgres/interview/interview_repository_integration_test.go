@@ -19,6 +19,7 @@ import (
 	evaluationModel "github.com/masterfabric-go/masterfabric/internal/domain/evaluation/model"
 	interviewModel "github.com/masterfabric-go/masterfabric/internal/domain/interview/model"
 	infraAuth "github.com/masterfabric-go/masterfabric/internal/infrastructure/auth"
+	pgAudit "github.com/masterfabric-go/masterfabric/internal/infrastructure/postgres/audit"
 	pgEvaluation "github.com/masterfabric-go/masterfabric/internal/infrastructure/postgres/evaluation"
 	pgInterview "github.com/masterfabric-go/masterfabric/internal/infrastructure/postgres/interview"
 	"github.com/masterfabric-go/masterfabric/internal/shared/authcontext"
@@ -50,6 +51,7 @@ func TestInterviewLifecyclePostgres(t *testing.T) {
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cleanupCancel()
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM audit_logs WHERE organization_id=$1`, organizationID)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM audit_outbox WHERE organization_id=$1`, organizationID)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM organizations WHERE id=$1`, organizationID)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM users WHERE id=$1 OR id=$2`, interviewerID, candidateID)
@@ -198,6 +200,22 @@ func TestInterviewLifecyclePostgres(t *testing.T) {
 	assert.NotContains(t, payloads, answerText)
 	assert.NotContains(t, payloads, correction)
 	assert.NotContains(t, payloads, invitation.Token)
+
+	auditRepository := pgAudit.NewAuditRepo(pool)
+	relayed, err := auditRepository.RelayPending(ctx, 100)
+	require.NoError(t, err)
+	assert.Equal(t, outboxCount, relayed, "every committed outbox event must be projected")
+	relayed, err = auditRepository.RelayPending(ctx, 100)
+	require.NoError(t, err)
+	assert.Zero(t, relayed, "published events must be safe to retry without duplicates")
+	var projectedCount int
+	var projectedPayloads string
+	require.NoError(t, pool.QueryRow(ctx, `SELECT count(*),COALESCE(string_agg(metadata::text,''),'') FROM audit_logs WHERE organization_id=$1`, organizationID).Scan(&projectedCount, &projectedPayloads))
+	assert.Equal(t, outboxCount, projectedCount)
+	assert.NotContains(t, projectedPayloads, question.Prompt)
+	assert.NotContains(t, projectedPayloads, answerText)
+	assert.NotContains(t, projectedPayloads, correction)
+	assert.NotContains(t, projectedPayloads, invitation.Token)
 
 	var storedHash string
 	require.NoError(t, pool.QueryRow(ctx, `SELECT token_hash FROM interview_invitations WHERE id=$1`, invitation.Invitation.ID).Scan(&storedHash))

@@ -86,9 +86,9 @@ The mappings below show which existing use cases may be reused. They do not auth
 | Devices | None | Public keys, challenges, signatures, trust/revoke/last seen | `myDevices`, registration and revocation mutations | OTP, session service, secure client storage |
 | Interviews | Interview aggregate, lifecycle, invitation, consent, candidate scope, keyset-paginated connection | Interview aggregate, lifecycle, invitation, consent, candidate scope | `interviews`, `interviewConnection`, `interview`, create/publish/start/complete | Tenant identity, audit |
 | Questions | None | Types, competencies, ordering, difficulty, immutable publication | `question`, `addQuestion`, interview connection | Interview lifecycle, rubric |
-| Answers | None | Text/code versions, idempotency, submission status, evidence links | `answer`, `submitAnswer` | Candidate token, object storage, sandbox later |
+| Answers | Immutable text/code versions, idempotency, content hashes | Evidence links and execution lifecycle | `answer`, `submitAnswer` | Candidate token, object storage, sandbox later |
 | Realtime interview | Candidate-safe `interviewUpdated` lifecycle stream, tenant/interview keyed broker, JWT scope checks | Durable reconnect cursor and cross-instance fan-out | `interviewUpdated` | Event bus, subscription transport, replay store |
-| Code execution | None | Isolated runner, resource limits, language images, result signing | `TestEvidence` initially read-only | Separate sandbox service/adapter; later phase |
+| Code execution | Fail-closed external sandbox adapter contract with request/result bounds and provenance requirement; not enabled by default | Isolated runner, resource limits, language images, cryptographic result verification and evidence persistence | `TestEvidence` initially read-only | Separate sandbox service, trusted key ring, artifact store, security review |
 | Evaluation | Evaluation job/report persistence and deterministic baseline | Provider-backed scoring, richer rubric administration, benchmark lifecycle | `evaluationReport`, `requestEvaluation` | AI contracts, interview evidence |
 | Human review | Review record, requester separation, publication gate | Queue/assignment UI and operational workflows | `recordHumanReview` and report fields | Evaluation, admin RBAC, audit |
 | LLM registry | Tenant-scoped model metadata, role capability, status, and immutable configuration versions | Provider/model metadata, residency, secret references | `ModelConfiguration` inside admin config | Secret manager, admin approval |
@@ -147,7 +147,7 @@ Migrated PostgreSQL/Redis integration validation with managed JWT keys (explicit
   -> audit relay alerting/retention and complete admin audit lifecycle
   -> real interviewer/evaluator model artifacts and quality/latency evidence
   -> durable subscription replay/cursor and cross-instance fan-out
-  -> separately reviewed code-execution sandbox
+  -> owner-authorized sandbox deployment, key-ring verification, and isolated interoperability test
   -> deletion, retention, export, and legal-hold verification
   -> frontend E2E and authorized release packaging
 ```

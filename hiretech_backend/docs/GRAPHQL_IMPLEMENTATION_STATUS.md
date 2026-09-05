@@ -150,6 +150,11 @@ Required validation commands:
 - Development startup tolerates unavailable PostgreSQL/Redis for local iteration; with `APP_ENV=production`, startup now fails closed when either required security dependency is unavailable.
 - Authorization-version revocation and live membership revalidation remain future hardening work.
 - Invitation hashing currently derives from the configured application secret; production should use a separately managed, rotatable invitation-key ring.
+- Code execution is not enabled in the API process. A fail-closed external
+  sandbox adapter contract exists with bounded source/output/timeout limits,
+  secure endpoint checks, redirect blocking, and mandatory injected result
+  provenance verification. External runner deployment, key-ring verification,
+  artifact retention, and interoperability evidence remain release gates.
 - Retention, deletion, legal-hold, and candidate export workflows are not part of this phase.
 - The PostgreSQL integration test requires an isolated migrated test database. The explicit `make test-integration` gate fails when `INTERVIEW_TEST_DSN` is absent; invoking `go test ./...` directly still skips that environment-gated test by design.
 

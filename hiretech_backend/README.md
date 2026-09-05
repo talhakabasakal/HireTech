@@ -285,6 +285,7 @@ For the complete trust model, accepted risks, and the **Security Controls Regist
 | **RBAC coverage** | JWT was required but any authenticated user could call admin routes; wildcard permissions in seed data were not honored | **`RequirePermission`** on all admin routes; wildcard-aware matching (`*`, `org:*`, `*:read`) | Ensures state-changing operations require explicit grants, not just a valid token (CWE-306) |
 | **Migration script** | `migrate.sh create NAME` did not sanitize `NAME`, allowing path traversal in filenames | Name restricted to **`[a-zA-Z0-9_]`** | Blocks `../` injection when migration files are created via automation (CWE-22) |
 | **JWT secret default** | Server could start with `change-me-in-production` | **Production startup rejection** for the default or shorter-than-32-character JWT secret | Prevents a known or weak signing secret from reaching a production listener |
+| **Audit outbox delivery** | Transactional audit events could remain pending indefinitely | Bounded in-process relay projects pending rows idempotently into `audit_logs` | Keeps business mutation and durable audit projection reliable without adding a separate queue service |
 | **Gateway proxy (gosec G704)** | Intentional SSRF sink for operator-configured backend URLs | Documented as an **accepted risk** in SECURITY.md with audited `#nosec` suppressions | Proxying is a core gateway feature; risk is bounded by RBAC on endpoint creation |
 
 ### Verification

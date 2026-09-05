@@ -99,7 +99,7 @@ Required validation commands:
 
 ## Known limitations and production prerequisites
 
-- The outbox is transactionally populated, but a relay/consumer that publishes pending rows to the long-term audit store is still required.
+- Audit mutations populate the outbox transactionally, and the server now runs a bounded in-process relay that projects pending rows idempotently into `audit_logs`. A separately monitored worker remains recommended for high-volume production deployments.
 - Admin configuration versions and the generic request audit projection are
   available, but dedicated admin lifecycle events, approval/rollback actions,
   paginated audit connections, and transactional coupling between an admin

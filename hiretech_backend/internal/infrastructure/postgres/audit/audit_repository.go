@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,6 +38,88 @@ func (r *AuditRepo) Create(ctx context.Context, log *model.AuditLog) error {
 		return domainErr.New(domainErr.ErrInternal, "failed to create audit log", err)
 	}
 	return nil
+}
+
+// RelayPending atomically projects a bounded batch of audit outbox rows into
+// audit_logs. SELECT ... FOR UPDATE SKIP LOCKED allows multiple relay workers
+// to run safely, while the outbox ID makes retries idempotent.
+func (r *AuditRepo) RelayPending(ctx context.Context, limit int) (count int, err error) {
+	if limit <= 0 {
+		return 0, nil
+	}
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return 0, domainErr.New(domainErr.ErrInternal, "failed to begin audit outbox relay", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	rows, err := tx.Query(ctx, `
+		SELECT id, organization_id, action, resource_type, resource_id, payload, occurred_at
+		FROM audit_outbox
+		WHERE published_at IS NULL
+		ORDER BY occurred_at, id
+		FOR UPDATE SKIP LOCKED
+		LIMIT $1`, limit)
+	if err != nil {
+		return 0, domainErr.New(domainErr.ErrInternal, "failed to read pending audit events", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			id, organizationID, resourceID uuid.UUID
+			action, resourceType           string
+			payload                        []byte
+			occurredAt                     time.Time
+		)
+		if err = rows.Scan(&id, &organizationID, &action, &resourceType, &resourceID, &payload, &occurredAt); err != nil {
+			return 0, domainErr.New(domainErr.ErrInternal, "failed to scan pending audit event", err)
+		}
+
+		userID, requestID := auditActorAndRequest(payload)
+		_, err = tx.Exec(ctx, `
+			INSERT INTO audit_logs (id, organization_id, user_id, request_id, action, resource_type, resource_id, metadata, created_at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+			ON CONFLICT (id) DO NOTHING`,
+			id, organizationID, userID, requestID, action, resourceType, resourceID.String(), payload, occurredAt,
+		)
+		if err != nil {
+			return 0, domainErr.New(domainErr.ErrInternal, "failed to project audit event", err)
+		}
+
+		_, err = tx.Exec(ctx, `UPDATE audit_outbox SET published_at=$2 WHERE id=$1 AND published_at IS NULL`, id, time.Now().UTC())
+		if err != nil {
+			return 0, domainErr.New(domainErr.ErrInternal, "failed to mark audit event published", err)
+		}
+		count++
+	}
+	if err = rows.Err(); err != nil {
+		return 0, domainErr.New(domainErr.ErrInternal, "failed to iterate pending audit events", err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return 0, domainErr.New(domainErr.ErrInternal, "failed to commit audit outbox relay", err)
+	}
+	return count, nil
+}
+
+func auditActorAndRequest(payload []byte) (*uuid.UUID, string) {
+	var envelope struct {
+		ActorID   *string `json:"actor_id"`
+		RequestID string  `json:"request_id"`
+	}
+	if err := json.Unmarshal(payload, &envelope); err != nil || envelope.ActorID == nil {
+		return nil, envelope.RequestID
+	}
+	actorID, err := uuid.Parse(*envelope.ActorID)
+	if err != nil || actorID == uuid.Nil {
+		return nil, envelope.RequestID
+	}
+	return &actorID, envelope.RequestID
 }
 
 func (r *AuditRepo) ListByOrg(ctx context.Context, orgID uuid.UUID, offset, limit int) ([]*model.AuditLog, int, error) {

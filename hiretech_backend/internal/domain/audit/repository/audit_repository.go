@@ -15,6 +15,12 @@ type AuditRepository interface {
 	ListByResource(ctx context.Context, resourceType, resourceID string, offset, limit int) ([]*model.AuditLog, int, error)
 }
 
+// OutboxRepository projects transactionally stored audit events into the
+// durable audit log store. Implementations must be safe to retry.
+type OutboxRepository interface {
+	RelayPending(ctx context.Context, limit int) (int, error)
+}
+
 // OrganizationScopedUserAuditRepository is the safe form of user audit reads.
 // Implementations must apply the organization predicate in storage.
 type OrganizationScopedUserAuditRepository interface {

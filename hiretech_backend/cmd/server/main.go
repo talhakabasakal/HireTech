@@ -38,6 +38,7 @@ import (
 	aiRuntime "github.com/masterfabric-go/masterfabric/internal/application/ai/runtime"
 	aiadminUC "github.com/masterfabric-go/masterfabric/internal/application/aiadmin/usecase"
 	apimgmtUC "github.com/masterfabric-go/masterfabric/internal/application/apimanagement/usecase"
+	auditUC "github.com/masterfabric-go/masterfabric/internal/application/audit/usecase"
 	evaluationUC "github.com/masterfabric-go/masterfabric/internal/application/evaluation/usecase"
 	iamUC "github.com/masterfabric-go/masterfabric/internal/application/iam/usecase"
 	interviewUC "github.com/masterfabric-go/masterfabric/internal/application/interview/usecase"
@@ -133,6 +134,11 @@ func run() error {
 	deps, err := buildDependencies(log, cfg, db, redisClient, eventBus)
 	if err != nil {
 		return err
+	}
+	serviceCtx, serviceCancel := context.WithCancel(context.Background())
+	defer serviceCancel()
+	if outboxRepo, ok := deps.AuditRepo.(auditUC.OutboxRepository); ok {
+		go auditUC.NewOutboxRelay(outboxRepo, log).Run(serviceCtx)
 	}
 
 	// Build router

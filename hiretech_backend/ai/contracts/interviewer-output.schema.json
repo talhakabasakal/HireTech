@@ -1,0 +1,549 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hiretech.example/schemas/ai/interviewer-output/1.0.0",
+  "title": "HireTech Interviewer Output",
+  "description": "Strict output contract for the interviewer LLM. It cannot make a hiring decision or final evaluation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "response_id",
+    "interview_id",
+    "turn_id",
+    "action",
+    "message",
+    "question",
+    "observations",
+    "tool_requests",
+    "safety",
+    "confidence",
+    "human_review",
+    "next_state"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "response_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "interview_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "turn_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "ASK_QUESTION",
+        "ASK_FOLLOW_UP",
+        "GIVE_ALLOWED_HINT",
+        "ACKNOWLEDGE",
+        "END_SECTION",
+        "END_INTERVIEW",
+        "REQUEST_HUMAN_REVIEW"
+      ]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "question": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/question"
+        }
+      ]
+    },
+    "observations": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    },
+    "tool_requests": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/runCodeTestsRequest"
+          },
+          {
+            "$ref": "#/$defs/fetchApprovedQuestionRequest"
+          }
+        ]
+      }
+    },
+    "safety": {
+      "$ref": "#/$defs/safety"
+    },
+    "confidence": {
+      "$ref": "#/$defs/confidence"
+    },
+    "human_review": {
+      "$ref": "#/$defs/humanReview"
+    },
+    "next_state": {
+      "type": "string",
+      "enum": [
+        "AWAITING_ANSWER",
+        "RUNNING_TOOL",
+        "SECTION_COMPLETE",
+        "INTERVIEW_COMPLETE",
+        "PAUSED_FOR_REVIEW"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "enum": [
+              "ASK_QUESTION",
+              "ASK_FOLLOW_UP"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "properties": {
+          "question": {
+            "$ref": "#/$defs/question"
+          },
+          "next_state": {
+            "const": "AWAITING_ANSWER"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "REQUEST_HUMAN_REVIEW"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "properties": {
+          "human_review": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/humanReview"
+              },
+              {
+                "properties": {
+                  "required": {
+                    "const": true
+                  }
+                }
+              }
+            ]
+          },
+          "next_state": {
+            "const": "PAUSED_FOR_REVIEW"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "END_INTERVIEW"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "properties": {
+          "next_state": {
+            "const": "INTERVIEW_COMPLETE"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question_id",
+        "type",
+        "prompt",
+        "competency_ids",
+        "difficulty",
+        "expected_answer_format",
+        "time_limit_seconds",
+        "follow_up_to_answer_id"
+      ],
+      "properties": {
+        "question_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "TECHNICAL_DISCUSSION",
+            "CODING",
+            "SYSTEM_DESIGN",
+            "DEBUGGING"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "competency_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"
+          }
+        },
+        "difficulty": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "expected_answer_format": {
+          "type": "string",
+          "enum": [
+            "TEXT",
+            "CODE",
+            "TEXT_AND_CODE",
+            "DIAGRAM_DESCRIPTION"
+          ]
+        },
+        "time_limit_seconds": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 7200
+            }
+          ]
+        },
+        "follow_up_to_answer_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "format": "uuid"
+            }
+          ]
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "evidence_reference",
+        "summary"
+      ],
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": [
+            "CLARITY",
+            "TECHNICAL_CONCEPT",
+            "ASSUMPTION",
+            "TESTING",
+            "DEBUGGING",
+            "TRADE_OFF",
+            "AI_COLLABORATION",
+            "MISSING_INFORMATION"
+          ]
+        },
+        "evidence_reference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        }
+      }
+    },
+    "runCodeTestsRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "tool",
+        "answer_id",
+        "test_suite_id"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tool": {
+          "const": "RUN_CODE_TESTS"
+        },
+        "answer_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "test_suite_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "fetchApprovedQuestionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "tool",
+        "competency_id",
+        "difficulty"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tool": {
+          "const": "FETCH_APPROVED_QUESTION"
+        },
+        "competency_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"
+        },
+        "difficulty": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "category_codes",
+        "candidate_message"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "REDACT",
+            "BLOCK"
+          ]
+        },
+        "category_codes": {
+          "type": "array",
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "PROMPT_INJECTION",
+              "PII_DISCLOSURE",
+              "SECRET_DISCLOSURE",
+              "UNAUTHORIZED_TOOL",
+              "TENANT_BOUNDARY",
+              "ABUSIVE_CONTENT",
+              "POLICY_CONFLICT"
+            ]
+          }
+        },
+        "candidate_message": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          ]
+        }
+      }
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "score",
+        "level",
+        "reason_codes"
+      ],
+      "properties": {
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "SUFFICIENT_CONTEXT",
+              "INCOMPLETE_ANSWER",
+              "AMBIGUOUS_ANSWER",
+              "MISSING_EVIDENCE",
+              "CONTRADICTORY_EVIDENCE",
+              "POLICY_AMBIGUITY",
+              "TOOL_RESULT_PENDING",
+              "SAFETY_UNCERTAINTY"
+            ]
+          }
+        }
+      }
+    },
+    "humanReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "urgency",
+        "reason_codes",
+        "summary"
+      ],
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "urgency": {
+          "type": "string",
+          "enum": [
+            "NONE",
+            "NORMAL",
+            "HIGH",
+            "IMMEDIATE"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "LOW_CONFIDENCE",
+              "MISSING_EVIDENCE",
+              "CONTRADICTORY_EVIDENCE",
+              "PROMPT_INJECTION",
+              "PII_OR_SECRET_RISK",
+              "UNAUTHORIZED_TOOL_REQUEST",
+              "CANDIDATE_SUPPORT_REQUEST",
+              "TECHNICAL_AMBIGUITY",
+              "POLICY_REQUIRED"
+            ]
+          }
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 1000
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "required": {
+                "const": false
+              }
+            },
+            "required": [
+              "required"
+            ]
+          },
+          "then": {
+            "properties": {
+              "urgency": {
+                "const": "NONE"
+              },
+              "reason_codes": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "required": {
+                "const": true
+              }
+            },
+            "required": [
+              "required"
+            ]
+          },
+          "then": {
+            "properties": {
+              "urgency": {
+                "enum": [
+                  "NORMAL",
+                  "HIGH",
+                  "IMMEDIATE"
+                ]
+              },
+              "reason_codes": {
+                "minItems": 1
+              },
+              "summary": {
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

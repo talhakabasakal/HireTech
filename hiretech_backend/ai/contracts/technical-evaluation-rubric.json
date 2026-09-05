@@ -1,0 +1,275 @@
+{
+  "rubric_id": "hiretech.technical-interview.general",
+  "version": "1.0.0",
+  "status": "DRAFT",
+  "purpose": "Evidence-based technical interview assessment for human decision support.",
+  "decision_boundary": "This rubric does not produce an autonomous hiring decision. A human reviews the evidence and makes the final decision.",
+  "score_scale": {
+    "minimum": 0,
+    "maximum": 4,
+    "increment": 0.5,
+    "anchors": [
+      {
+        "score": 0,
+        "label": "No assessable evidence",
+        "description": "The interview contains no reliable evidence for the criterion, or the response is entirely non-responsive. Missing evidence must not be interpreted as a personal deficiency."
+      },
+      {
+        "score": 1,
+        "label": "Materially below task expectations",
+        "description": "Evidence shows major conceptual or execution gaps that prevent completion even with ordinary clarification."
+      },
+      {
+        "score": 2,
+        "label": "Partially meets task expectations",
+        "description": "The approach demonstrates relevant understanding but contains important gaps, errors, or incomplete execution."
+      },
+      {
+        "score": 3,
+        "label": "Meets task expectations",
+        "description": "The candidate completes the essential work with sound reasoning and only minor issues that do not undermine the result."
+      },
+      {
+        "score": 4,
+        "label": "Strongly exceeds task expectations",
+        "description": "Evidence is consistently correct, deliberate, well-tested, and demonstrates unusually strong trade-off awareness for the configured seniority."
+      }
+    ]
+  },
+  "weight_profiles": [
+    {
+      "profile_id": "ai_enabled",
+      "applies_to_modes": [
+        "GUIDED_AI",
+        "AI_COLLABORATION"
+      ],
+      "weights": {
+        "problem_understanding": 0.15,
+        "solution_design": 0.15,
+        "code_correctness": 0.2,
+        "code_quality": 0.1,
+        "testing_and_debugging": 0.15,
+        "system_design": 0.1,
+        "technical_communication": 0.1,
+        "ai_collaboration": 0.05
+      }
+    },
+    {
+      "profile_id": "ai_disabled",
+      "applies_to_modes": [
+        "AI_DISABLED"
+      ],
+      "weights": {
+        "problem_understanding": 0.1579,
+        "solution_design": 0.1579,
+        "code_correctness": 0.2105,
+        "code_quality": 0.1053,
+        "testing_and_debugging": 0.1579,
+        "system_design": 0.1053,
+        "technical_communication": 0.1052,
+        "ai_collaboration": 0
+      }
+    }
+  ],
+  "criteria": [
+    {
+      "criterion_id": "problem_understanding",
+      "name": "Problem understanding",
+      "description": "Understands requirements, constraints, assumptions, edge cases, and the intended outcome before implementation.",
+      "evidence_types": [
+        "TECHNICAL_ANSWER",
+        "ASSUMPTION_LOG",
+        "CLARIFYING_QUESTION",
+        "CODE_ARTIFACT"
+      ],
+      "anchors": {
+        "0": "No assessable attempt to restate or understand the problem.",
+        "1": "Misses central requirements or proceeds from unsupported assumptions after clarification.",
+        "2": "Identifies the main goal but overlooks important constraints or edge cases.",
+        "3": "Accurately frames the problem, key constraints, and relevant edge cases.",
+        "4": "Builds a precise problem model, prioritizes ambiguities, and anticipates subtle failure modes appropriate to seniority."
+      }
+    },
+    {
+      "criterion_id": "solution_design",
+      "name": "Solution design and trade-offs",
+      "description": "Chooses a coherent approach and explains alternatives, complexity, risks, and trade-offs.",
+      "evidence_types": [
+        "TECHNICAL_ANSWER",
+        "DESIGN_ARTIFACT",
+        "CODE_ARTIFACT",
+        "TRADE_OFF_EXPLANATION"
+      ],
+      "anchors": {
+        "0": "No assessable solution approach.",
+        "1": "Approach is incompatible with core requirements or lacks a workable structure.",
+        "2": "Approach is plausible but incomplete or weakly justified.",
+        "3": "Approach is coherent, fits requirements, and explains meaningful trade-offs.",
+        "4": "Approach is robust, compares credible alternatives, and manages complexity and operational risk with depth appropriate to seniority."
+      }
+    },
+    {
+      "criterion_id": "code_correctness",
+      "name": "Code correctness",
+      "description": "Produces behavior that satisfies requirements and handles relevant edge cases.",
+      "evidence_types": [
+        "CODE_ARTIFACT",
+        "PUBLIC_TEST_RESULT",
+        "HIDDEN_TEST_RESULT",
+        "MANUAL_TRACE"
+      ],
+      "anchors": {
+        "0": "No runnable or assessable implementation when code is required.",
+        "1": "Implementation fails core behavior or contains severe correctness defects.",
+        "2": "Core path partly works, but important cases fail or remain incomplete.",
+        "3": "Essential behavior is correct with only minor, bounded defects.",
+        "4": "Implementation is correct across core and difficult edge cases, supported by trustworthy evidence."
+      }
+    },
+    {
+      "criterion_id": "code_quality",
+      "name": "Code quality and maintainability",
+      "description": "Writes clear, appropriately structured, secure, and maintainable code without unnecessary abstraction.",
+      "evidence_types": [
+        "CODE_ARTIFACT",
+        "CODE_DIFF",
+        "STATIC_ANALYSIS",
+        "EXPLANATION"
+      ],
+      "anchors": {
+        "0": "No assessable code.",
+        "1": "Code is unsafe or difficult to understand and change due to major structural issues.",
+        "2": "Code is understandable but has notable duplication, naming, structure, or safety problems.",
+        "3": "Code is clear, cohesive, appropriately structured, and handles errors reasonably.",
+        "4": "Code shows excellent judgment in clarity, boundaries, error handling, security, and maintainability for the task."
+      }
+    },
+    {
+      "criterion_id": "testing_and_debugging",
+      "name": "Testing and debugging",
+      "description": "Designs useful tests, interprets failures, isolates causes, and verifies fixes systematically.",
+      "evidence_types": [
+        "TEST_PLAN",
+        "PUBLIC_TEST_RESULT",
+        "HIDDEN_TEST_RESULT",
+        "DEBUGGING_TRACE",
+        "CODE_DIFF"
+      ],
+      "anchors": {
+        "0": "No assessable testing or debugging evidence.",
+        "1": "Relies on guesses or superficial checks and cannot isolate core failures.",
+        "2": "Uses some relevant checks but misses important cases or applies incomplete debugging.",
+        "3": "Tests meaningful behavior, diagnoses failures methodically, and verifies corrections.",
+        "4": "Builds a risk-focused test strategy and demonstrates disciplined, efficient debugging across subtle cases."
+      }
+    },
+    {
+      "criterion_id": "system_design",
+      "name": "System design",
+      "description": "Defines components, data flow, interfaces, scale assumptions, reliability, security, and operational trade-offs when system design is in scope.",
+      "evidence_types": [
+        "DESIGN_ARTIFACT",
+        "TECHNICAL_ANSWER",
+        "TRADE_OFF_EXPLANATION"
+      ],
+      "anchors": {
+        "0": "No assessable system-design evidence, or the criterion is marked not applicable.",
+        "1": "Design omits core components or creates fundamental correctness/security failures.",
+        "2": "Design covers primary components but lacks important scale, failure, data, or security reasoning.",
+        "3": "Design is coherent and addresses requirements, interfaces, scale, reliability, security, and trade-offs appropriately.",
+        "4": "Design demonstrates strong systems judgment, explicit assumptions, graceful failure handling, and operational depth appropriate to seniority."
+      }
+    },
+    {
+      "criterion_id": "technical_communication",
+      "name": "Technical communication",
+      "description": "Explains reasoning, assumptions, decisions, uncertainty, and results clearly and precisely.",
+      "evidence_types": [
+        "TECHNICAL_ANSWER",
+        "EXPLANATION",
+        "DESIGN_ARTIFACT"
+      ],
+      "anchors": {
+        "0": "No assessable communication evidence.",
+        "1": "Explanation is materially unclear, contradictory, or disconnected from the work.",
+        "2": "Communicates the main idea but leaves important reasoning or assumptions unclear.",
+        "3": "Communicates clearly, structures reasoning, and acknowledges relevant uncertainty.",
+        "4": "Communicates complex technical choices with exceptional clarity, precision, audience awareness, and intellectual honesty."
+      }
+    },
+    {
+      "criterion_id": "ai_collaboration",
+      "name": "AI collaboration",
+      "description": "Uses permitted AI assistance critically, verifies outputs, protects sensitive information, and remains accountable for the solution.",
+      "evidence_types": [
+        "AI_INTERACTION",
+        "CODE_DIFF",
+        "TEST_RESULT",
+        "EXPLANATION"
+      ],
+      "anchors": {
+        "0": "Not applicable in AI-disabled mode, or no assessable evidence in an enabled mode.",
+        "1": "Accepts unsafe/incorrect AI output without verification or violates the configured AI-use policy.",
+        "2": "Uses AI for relevant work but verification, prompting, or integration is inconsistent.",
+        "3": "Uses AI purposefully, verifies material output, and explains corrections and ownership.",
+        "4": "Demonstrates excellent tool judgment, decomposition, verification, security awareness, and independent technical control."
+      }
+    }
+  ],
+  "scoring_rules": {
+    "backend_recalculates_totals": true,
+    "require_evidence_for_applicable_score": true,
+    "missing_evidence_means_not_assessable": true,
+    "minimum_applicable_criteria": 4,
+    "minimum_overall_confidence_without_review": 0.75,
+    "renormalize_weights_for_not_applicable_criteria": true,
+    "maximum_single_criterion_share_after_renormalization": 0.35,
+    "round_overall_score_to": 0.1
+  },
+  "mandatory_human_review": [
+    {
+      "reason_code": "LOW_CONFIDENCE",
+      "condition": "overall confidence is below 0.75 or any material criterion confidence is below 0.60"
+    },
+    {
+      "reason_code": "INSUFFICIENT_EVIDENCE",
+      "condition": "fewer than four criteria are assessable or required evidence is missing"
+    },
+    {
+      "reason_code": "CONTRADICTORY_EVIDENCE",
+      "condition": "material evidence sources conflict and the conflict changes a likely score"
+    },
+    {
+      "reason_code": "PROMPT_INJECTION",
+      "condition": "prompt injection or tool poisoning is detected or suspected"
+    },
+    {
+      "reason_code": "UNRESOLVED_EVIDENCE",
+      "condition": "any cited evidence reference cannot be resolved within the interview"
+    },
+    {
+      "reason_code": "MODEL_DISAGREEMENT",
+      "condition": "independent evaluations differ beyond the configured criterion or overall threshold"
+    },
+    {
+      "reason_code": "SEVERE_NEGATIVE_ASSESSMENT",
+      "condition": "a report contains a severe negative claim that could materially influence a hiring decision"
+    },
+    {
+      "reason_code": "PROTECTED_ATTRIBUTE_RISK",
+      "condition": "content or rationale may rely on a protected attribute or proxy"
+    }
+  ],
+  "prohibited_inputs_and_factors": [
+    "name beyond a pseudonymous display label needed for conversation",
+    "age or date of birth",
+    "sex, gender identity, or sexual orientation",
+    "race, ethnicity, nationality, or native-language inference",
+    "religion, political opinion, or union membership",
+    "health, disability, biometric, face, voice, or eye-tracking data",
+    "marital, family, pregnancy, or caregiving status",
+    "home address, wealth, or unrelated socioeconomic proxies",
+    "personality or emotion inference",
+    "speed alone without an approved job-related requirement and accommodation process"
+  ]
+}

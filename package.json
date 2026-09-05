@@ -1,0 +1,11 @@
+{
+  "name": "hiretech",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix hiretech_frontend run dev:web",
+    "dev:web": "npm --prefix hiretech_frontend run dev:web",
+    "dev:desktop": "npm --prefix hiretech_frontend run dev:desktop",
+    "build:web": "npm --prefix hiretech_frontend run build:web",
+    "electron:dist": "npm --prefix hiretech_frontend run electron:dist"
+  }
+}

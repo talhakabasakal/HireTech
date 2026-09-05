@@ -1,0 +1,472 @@
+scalar UUID
+scalar DateTime
+
+enum TokenClass {
+  BOOTSTRAP
+  TENANT
+  CANDIDATE_INTERVIEW
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  REMOVED
+}
+
+enum InterviewStatus {
+  DRAFT
+  READY
+  INVITED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum InterviewLanguage {
+  TR
+  EN
+}
+
+enum QuestionSource {
+  HUMAN
+  AI
+}
+
+enum InterviewMode {
+  AI_DISABLED
+  GUIDED_AI
+  AI_COLLABORATION
+}
+
+enum QuestionType {
+  TECHNICAL_DISCUSSION
+  CODING
+  SYSTEM_DESIGN
+  DEBUGGING
+}
+
+enum AnswerStatus {
+  SUBMITTED
+  SUPERSEDED
+}
+
+enum QuestionDraftStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum EvaluationStatus {
+  DRAFT
+  REVIEW_REQUIRED
+  READY_FOR_HUMAN_DECISION
+  PUBLISHED
+  REJECTED
+}
+
+enum HumanReviewUrgency {
+  NONE
+  NORMAL
+  HIGH
+  IMMEDIATE
+}
+
+enum AdminLLMRole {
+  INTERVIEWER
+  EVALUATOR
+}
+
+enum AdminModelStatus {
+  ACTIVE
+  FALLBACK
+  DISABLED
+}
+
+enum AdminLatencyClass {
+  FAST
+  BALANCED
+  DEEP
+}
+
+enum AdminPromptStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+type AdminModel {
+  id: UUID!
+  modelId: String!
+  displayName: String!
+  providerLabel: String!
+  roles: [AdminLLMRole!]!
+  status: AdminModelStatus!
+  latencyClass: AdminLatencyClass!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AdminPromptConfiguration {
+  id: UUID!
+  role: AdminLLMRole!
+  name: String!
+  version: Int!
+  promptTemplate: String!
+  status: AdminPromptStatus!
+  updatedAt: DateTime!
+  updatedBy: UUID!
+}
+
+type AdminRubricCriterion {
+  name: String!
+  weight: Float!
+}
+
+type AdminEvaluationRubric {
+  id: UUID!
+  name: String!
+  version: Int!
+  criteria: [AdminRubricCriterion!]!
+  status: AdminPromptStatus!
+  updatedAt: DateTime!
+  updatedBy: UUID!
+}
+
+type AdminRoutingRule {
+  id: UUID!
+  role: AdminLLMRole!
+  primaryModelId: String!
+  fallbackModelId: String!
+  timeoutSeconds: Int!
+  enabled: Boolean!
+  updatedAt: DateTime!
+  updatedBy: UUID!
+}
+
+type AdminConfigurationVersion {
+  id: UUID!
+  resource: String!
+  version: Int!
+  action: String!
+  status: String!
+  actor: UUID!
+  createdAt: DateTime!
+}
+
+type AdminAuditEvent {
+  id: UUID!
+  action: String!
+  actor: UUID!
+  target: String!
+  result: String!
+  occurredAt: DateTime!
+}
+
+type AdminWorkspace {
+  models: [AdminModel!]!
+  prompts: [AdminPromptConfiguration!]!
+  rubric: AdminEvaluationRubric
+  routing: [AdminRoutingRule!]!
+  versions: [AdminConfigurationVersion!]!
+  auditEvents: [AdminAuditEvent!]!
+}
+
+input RegisterAdminModelInput {
+  modelId: String!
+  displayName: String!
+  providerLabel: String!
+  roles: [AdminLLMRole!]!
+  status: AdminModelStatus = ACTIVE
+  latencyClass: AdminLatencyClass = BALANCED
+}
+
+input CreateAdminPromptVersionInput {
+  role: AdminLLMRole!
+  name: String!
+  promptTemplate: String!
+}
+
+input UpdateAdminRoutingInput {
+  role: AdminLLMRole!
+  primaryModelId: String!
+  fallbackModelId: String!
+  timeoutSeconds: Int!
+  enabled: Boolean!
+}
+
+input PublishAdminRubricInput {
+  name: String!
+  criteria: [AdminRubricCriterionInput!]!
+}
+
+input AdminRubricCriterionInput {
+  name: String!
+  weight: Float!
+}
+
+type User {
+  id: UUID!
+  email: String!
+  firstName: String!
+  lastName: String!
+  fullName: String!
+  status: UserStatus!
+  createdAt: DateTime!
+}
+
+type Organization {
+  id: UUID!
+  name: String!
+  slug: String!
+  status: OrganizationStatus!
+  createdAt: DateTime!
+}
+
+type OrganizationMembership {
+  organization: Organization!
+  status: MembershipStatus!
+}
+
+type SelectOrganizationPayload {
+  accessToken: String!
+  tokenClass: TokenClass!
+  organization: Organization!
+  membership: OrganizationMembership!
+}
+
+type Interview {
+  id: UUID!
+  organizationId: UUID!
+  candidateUserId: UUID
+  candidateEmail: String!
+  candidateDisplayName: String!
+  title: String!
+  positionTitle: String!
+  seniority: String!
+  technologyTags: [String!]!
+  mode: InterviewMode!
+  language: InterviewLanguage!
+  questionSource: QuestionSource!
+  rubricVersion: String!
+  status: InterviewStatus!
+  startsAt: DateTime
+  expiresAt: DateTime!
+  startedAt: DateTime
+  completedAt: DateTime
+  cancelledAt: DateTime
+  version: Int!
+  questions: [Question!]!
+  answers: [Answer!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Question {
+  id: UUID!
+  interviewId: UUID!
+  sequence: Int!
+  type: QuestionType!
+  prompt: String!
+  competencyIds: [String!]!
+  difficulty: Int!
+  timeLimitSeconds: Int
+  createdAt: DateTime!
+}
+
+type QuestionDraft {
+  id: UUID!
+  interviewId: UUID!
+  requestedBy: UUID!
+  reviewedBy: UUID
+  type: QuestionType!
+  prompt: String!
+  competencyIds: [String!]!
+  difficulty: Int!
+  timeLimitSeconds: Int
+  language: InterviewLanguage!
+  status: QuestionDraftStatus!
+  modelId: String!
+  modelVersion: String!
+  reviewNotes: String!
+  createdAt: DateTime!
+  reviewedAt: DateTime
+}
+
+type Answer {
+  id: UUID!
+  interviewId: UUID!
+  questionId: UUID!
+  status: AnswerStatus!
+  text: String
+  codeLanguage: String
+  codeContent: String
+  contentHash: String!
+  idempotencyKey: UUID!
+  supersedesId: UUID
+  submittedAt: DateTime!
+}
+
+type InterviewInvitationPayload {
+  invitationId: UUID!
+  token: String!
+  expiresAt: DateTime!
+}
+
+type CandidateInterviewAccess {
+  accessToken: String!
+  tokenClass: TokenClass!
+  interview: Interview!
+}
+
+type CriterionScore {
+  criterionId: String!
+  applicable: Boolean!
+  score: Float
+  maximumScore: Float!
+  weight: Float!
+  confidence: Float!
+  evidenceReferences: [String!]!
+  rationale: String!
+  limitations: [String!]!
+}
+
+type HumanReview {
+  required: Boolean!
+  urgency: HumanReviewUrgency!
+  reasonCodes: [String!]!
+  status: String!
+  reviewerUserId: UUID
+  notes: String!
+  completedAt: DateTime
+}
+
+type EvaluationReport {
+  id: UUID!
+  interviewId: UUID!
+  status: EvaluationStatus!
+  rubricId: String!
+  rubricVersion: String!
+  evaluatorConfigurationVersion: String!
+  overallScore: Float
+  overallConfidence: Float!
+  criterionScores: [CriterionScore!]!
+  strengths: [String!]!
+  gaps: [String!]!
+  evidenceReferences: [String!]!
+  limitations: [String!]!
+  humanReview: HumanReview!
+  generatedAt: DateTime
+  publishedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input CreateInterviewInput {
+  title: String!
+  candidateEmail: String!
+  candidateDisplayName: String!
+  positionTitle: String!
+  seniority: String!
+  technologyTags: [String!]!
+  mode: InterviewMode!
+  language: InterviewLanguage
+  questionSource: QuestionSource
+  rubricVersion: String!
+  startsAt: DateTime
+  expiresAt: DateTime!
+}
+
+input CreateQuestionInput {
+  interviewId: UUID!
+  type: QuestionType!
+  prompt: String!
+  competencyIds: [String!]!
+  difficulty: Int!
+  timeLimitSeconds: Int
+}
+
+input RequestQuestionDraftInput {
+  interviewId: UUID!
+  type: QuestionType!
+  competencyIds: [String!]!
+  difficulty: Int!
+  timeLimitSeconds: Int
+  taskBrief: String
+}
+
+input RejectQuestionDraftInput {
+  draftId: UUID!
+  notes: String!
+}
+
+input RedeemInterviewInvitationInput {
+  token: String!
+  policyVersion: String!
+  locale: String!
+  purpose: String!
+}
+
+input SubmitAnswerInput {
+  interviewId: UUID!
+  questionId: UUID!
+  text: String
+  codeLanguage: String
+  codeContent: String
+  idempotencyKey: UUID!
+  supersedesId: UUID
+}
+
+input HumanReviewInput {
+  reportId: UUID!
+  approvedForPublication: Boolean!
+  notes: String!
+}
+
+type Query {
+  me: User!
+  organizations: [OrganizationMembership!]!
+  interviews(statuses: [InterviewStatus!], limit: Int = 50): [Interview!]!
+  interview(id: UUID!): Interview
+  question(id: UUID!): Question
+  answer(id: UUID!): Answer
+  questionDraft(id: UUID!): QuestionDraft
+  evaluationReport(interviewId: UUID!): EvaluationReport
+  adminWorkspace: AdminWorkspace!
+}
+
+type Mutation {
+  selectOrganization(organizationId: UUID!): SelectOrganizationPayload!
+  createInterview(input: CreateInterviewInput!): Interview!
+  addQuestion(input: CreateQuestionInput!): Question!
+  requestQuestionDraft(input: RequestQuestionDraftInput!): QuestionDraft!
+  approveQuestionDraft(draftId: UUID!): Question!
+  rejectQuestionDraft(input: RejectQuestionDraftInput!): QuestionDraft!
+  publishInterview(interviewId: UUID!): Interview!
+  createInterviewInvitation(interviewId: UUID!, expiresAt: DateTime): InterviewInvitationPayload!
+  redeemInterviewInvitation(input: RedeemInterviewInvitationInput!): CandidateInterviewAccess!
+  startInterview(interviewId: UUID!): Interview!
+  submitAnswer(input: SubmitAnswerInput!): Answer!
+  completeInterview(interviewId: UUID!): Interview!
+  cancelInterview(interviewId: UUID!): Interview!
+  requestEvaluation(interviewId: UUID!): EvaluationReport!
+  recordHumanReview(input: HumanReviewInput!): EvaluationReport!
+  registerAdminModel(input: RegisterAdminModelInput!): AdminModel!
+  createAdminPromptVersion(input: CreateAdminPromptVersionInput!): AdminPromptConfiguration!
+  updateAdminRouting(input: UpdateAdminRoutingInput!): AdminRoutingRule!
+  publishAdminRubric(input: PublishAdminRubricInput!): AdminEvaluationRubric!
+  approveAdminConfiguration(resource: String!, resourceKey: String!, version: Int!): AdminConfigurationVersion!
+  rollbackAdminConfiguration(resource: String!, resourceKey: String!, version: Int!): AdminConfigurationVersion!
+}

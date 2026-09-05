@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "selection": [
+    {
+      "role": "INTERVIEWER",
+      "model_id": "microsoft/Phi-4-mini-instruct",
+      "url": "https://huggingface.co/microsoft/Phi-4-mini-instruct",
+      "adapter_dir": "artifacts/phi-4-mini-interviewer",
+      "max_length": 2048,
+      "learning_rate": 0.0001,
+      "trust_remote_code": true,
+      "reason": "Talimat takipli, düşük gecikmeli ve yapılandırılmış görüşme akışı için."
+    },
+    {
+      "role": "EVALUATOR",
+      "model_id": "Qwen/Qwen3-4B",
+      "url": "https://huggingface.co/Qwen/Qwen3-4B",
+      "adapter_dir": "artifacts/qwen3-4b-evaluator",
+      "max_length": 4096,
+      "learning_rate": 5e-05,
+      "trust_remote_code": false,
+      "reason": "Kanıt-temelli değerlendirme, rubric uyumu ve Türkçe çıktı için."
+    }
+  ],
+  "not_selected": [
+    {
+      "model_id": "Qwen/Qwen3-8B",
+      "reason": "Bu hızlı/ücretsiz QLoRA başlangıcında 4B seçildi; 8B ikinci aşama karşılaştırma modeli olabilir."
+    },
+    {
+      "model_id": "Qwen/Qwen3.8-Flash-Next",
+      "reason": "QLoRA için normal tek GPU hedefinden çok büyük ve deneysel."
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+[
+  {
+    "id": "stindardlogic/coding-interview-sft-100k",
+    "role": "INTERVIEWER",
+    "use": "SOURCE_MATERIAL",
+    "note": "Sample and rewrite; do not copy unreviewed reasoning.",
+    "url": "https://huggingface.co/datasets/stindardlogic/coding-interview-sft-100k"
+  },
+  {
+    "id": "bhushanj221/Ai_interview",
+    "role": "INTERVIEWER",
+    "use": "QUESTION_SEED",
+    "note": "Generated data; treat as seed, not ground truth.",
+    "url": "https://huggingface.co/datasets/bhushanj221/Ai_interview"
+  },
+  {
+    "id": "barandinho/HumanEval-TR",
+    "role": "INTERVIEWER",
+    "use": "LANGUAGE_AND_CODING_BENCHMARK",
+    "note": "Use Turkish coding prompts and held-out evaluation.",
+    "url": "https://huggingface.co/datasets/barandinho/HumanEval-TR"
+  },
+  {
+    "id": "bigcode/humanevalpack",
+    "role": "EVALUATOR",
+    "use": "SOURCE_MATERIAL_AND_BENCHMARK",
+    "note": "Use tests, buggy solutions and failure symptoms to author evidence-based cases.",
+    "url": "https://huggingface.co/datasets/bigcode/humanevalpack"
+  },
+  {
+    "id": "livecodebench/execution-v2",
+    "role": "EVALUATOR",
+    "use": "BENCHMARK_ONLY",
+    "note": "Keep completely out of SFT; use for regression evaluation.",
+    "url": "https://huggingface.co/datasets/livecodebench/execution-v2"
+  },
+  {
+    "id": "livecodebench/code_generation_lite",
+    "role": "EVALUATOR",
+    "use": "BENCHMARK_ONLY",
+    "note": "Keep completely out of SFT; use for regression evaluation.",
+    "url": "https://huggingface.co/datasets/livecodebench/code_generation_lite"
+  },
+  {
+    "id": "AltaySec/turkish-llm-injection",
+    "role": "SECURITY",
+    "use": "SECURITY_TEST_ONLY",
+    "note": "Adversarial test set, never normal training data.",
+    "url": "https://huggingface.co/datasets/AltaySec/turkish-llm-injection"
+  },
+  {
+    "id": "tugrulkaya/turkish-pii-dataset",
+    "role": "SECURITY",
+    "use": "SECURITY_TEST_ONLY",
+    "note": "PII redaction test seed; never candidate data.",
+    "url": "https://huggingface.co/datasets/tugrulkaya/turkish-pii-dataset"
+  }
+]

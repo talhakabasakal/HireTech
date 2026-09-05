@@ -1,0 +1,100 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+**/node_modules/
+**/.pnp
+.pnp.*
+**/.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+**/coverage/
+
+# next.js
+**/.next/
+**/out/
+**/release/
+
+# production
+**/build/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+!hiretech_frontend/.env.example
+hiretech_frontend/electron/runtime-config.generated.json
+
+# vercel
+**/.vercel/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Go backend
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of Go coverage
+*.out
+coverage.html
+
+# Go workspace
+go.work
+go.work.sum
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+
+# Environment
+.env.local
+.env.*.local
+
+# Vendor (optional)
+# vendor/
+
+# Build output
+dist/
+tmp/
+.tmp/
+
+# Air hot-reload
+bin/air
+# AI training data and generated artifacts
+hiretech_backend/ai/training/data/raw/*
+!hiretech_backend/ai/training/data/raw/README.md
+hiretech_backend/ai/training/data/curated/*
+!hiretech_backend/ai/training/data/curated/.gitkeep
+hiretech_backend/ai/training/artifacts/
+hiretech_backend/ai/training/.cache/
+hiretech_backend/ai/runtime/adapters/
+hiretech_backend/ai/runtime/.venv/
+**/.cache/huggingface/
+**/__pycache__/

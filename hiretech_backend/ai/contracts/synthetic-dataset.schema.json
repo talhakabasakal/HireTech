@@ -1,0 +1,613 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hiretech.example/schemas/ai/synthetic-dataset/1.0.0",
+  "title": "HireTech Synthetic Evaluation Dataset",
+  "description": "Format for generated benchmark data. Records must not contain real candidate or employee data.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "dataset_version",
+    "source_type",
+    "contains_real_person_data",
+    "purpose",
+    "created_at",
+    "content_hash",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{1,127}$"
+    },
+    "dataset_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "source_type": {
+      "const": "SYNTHETIC"
+    },
+    "contains_real_person_data": {
+      "const": false
+    },
+    "purpose": {
+      "type": "string",
+      "enum": [
+        "DEVELOPMENT",
+        "VALIDATION",
+        "SECURITY_TEST",
+        "HIDDEN_TEST"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/record"
+      }
+    }
+  },
+  "$defs": {
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "synthetic_subject_id",
+        "split",
+        "provenance",
+        "scenario",
+        "task",
+        "transcript",
+        "artifacts",
+        "security_cases",
+        "expected_interviewer",
+        "expected_evaluation",
+        "review"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "pattern": "^SYN-REC-[A-Z0-9-]{4,64}$"
+        },
+        "synthetic_subject_id": {
+          "type": "string",
+          "pattern": "^SYN-SUBJECT-[A-Z0-9-]{4,64}$"
+        },
+        "split": {
+          "type": "string",
+          "enum": [
+            "TRAIN",
+            "DEVELOPMENT",
+            "TEST",
+            "SECURITY_TEST"
+          ]
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "scenario": {
+          "$ref": "#/$defs/scenario"
+        },
+        "task": {
+          "$ref": "#/$defs/task"
+        },
+        "transcript": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/message"
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "maxItems": 30,
+          "items": {
+            "$ref": "#/$defs/artifact"
+          }
+        },
+        "security_cases": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "DIRECT_PROMPT_INJECTION",
+              "INDIRECT_PROMPT_INJECTION",
+              "TOOL_POISONING",
+              "PII_TRAP",
+              "SECRET_CANARY",
+              "TENANT_BOUNDARY_TRAP",
+              "UNAUTHORIZED_TOOL_REQUEST",
+              "PROTECTED_ATTRIBUTE_TRAP",
+              "EVIDENCE_FABRICATION_TRAP",
+              "PROVIDER_TIMEOUT",
+              "PROVIDER_RATE_LIMIT",
+              "TRUNCATED_OUTPUT",
+              "INVALID_JSON"
+            ]
+          }
+        },
+        "expected_interviewer": {
+          "$ref": "#/$defs/expectedInterviewer"
+        },
+        "expected_evaluation": {
+          "$ref": "#/$defs/expectedEvaluation"
+        },
+        "review": {
+          "$ref": "#/$defs/review"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation_method",
+        "generator_reference",
+        "prompt_template_version",
+        "generated_at",
+        "source_material_policy"
+      ],
+      "properties": {
+        "generation_method": {
+          "type": "string",
+          "enum": [
+            "RULE_BASED",
+            "MODEL_GENERATED",
+            "HYBRID"
+          ]
+        },
+        "generator_reference": {
+          "type": "string",
+          "pattern": "^(registry|generator)://[A-Za-z0-9._/-]+$"
+        },
+        "prompt_template_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source_material_policy": {
+          "const": "NO_REAL_CANDIDATE_DATA"
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role_family",
+        "seniority",
+        "technology_tags",
+        "interview_mode",
+        "difficulty",
+        "locale"
+      ],
+      "properties": {
+        "role_family": {
+          "type": "string",
+          "enum": [
+            "BACKEND_ENGINEERING",
+            "FRONTEND_ENGINEERING",
+            "FULL_STACK_ENGINEERING",
+            "MOBILE_ENGINEERING",
+            "DATA_ENGINEERING",
+            "PLATFORM_ENGINEERING",
+            "SECURITY_ENGINEERING",
+            "QUALITY_ENGINEERING"
+          ]
+        },
+        "seniority": {
+          "type": "string",
+          "enum": [
+            "JUNIOR",
+            "MID_LEVEL",
+            "SENIOR",
+            "STAFF"
+          ]
+        },
+        "technology_tags": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9+.#_-]{0,39}$"
+          }
+        },
+        "interview_mode": {
+          "type": "string",
+          "enum": [
+            "AI_DISABLED",
+            "GUIDED_AI",
+            "AI_COLLABORATION"
+          ]
+        },
+        "difficulty": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "locale": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "type",
+        "prompt",
+        "competency_ids",
+        "expected_concepts",
+        "rubric_version"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^SYN-TASK-[A-Z0-9-]{4,64}$"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "TECHNICAL_DISCUSSION",
+            "CODING",
+            "SYSTEM_DESIGN",
+            "DEBUGGING"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12000
+        },
+        "competency_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"
+          }
+        },
+        "expected_concepts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 30,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "rubric_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        }
+      }
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "message_id",
+        "sequence",
+        "role",
+        "content",
+        "content_hash"
+      ],
+      "properties": {
+        "message_id": {
+          "type": "string",
+          "pattern": "^SYN-MSG-[A-Z0-9-]{4,64}$"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "SYSTEM_FIXTURE",
+            "INTERVIEWER",
+            "SYNTHETIC_CANDIDATE",
+            "TRUSTED_TOOL"
+          ]
+        },
+        "content": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "type",
+        "media_type",
+        "content",
+        "content_hash",
+        "trusted"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "pattern": "^SYN-ART-[A-Z0-9-]{4,64}$"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "CODE",
+            "TEST_RESULT",
+            "DEBUG_TRACE",
+            "DESIGN_DESCRIPTION",
+            "TOOL_RESULT"
+          ]
+        },
+        "media_type": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "content": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "trusted": {
+          "type": "boolean"
+        }
+      }
+    },
+    "expectedInterviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "output_schema_version",
+        "allowed_actions",
+        "forbidden_actions",
+        "required_competency_ids",
+        "human_review_required",
+        "human_review_reason_codes"
+      ],
+      "properties": {
+        "output_schema_version": {
+          "const": "1.0.0"
+        },
+        "allowed_actions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "ASK_QUESTION",
+              "ASK_FOLLOW_UP",
+              "GIVE_ALLOWED_HINT",
+              "ACKNOWLEDGE",
+              "END_SECTION",
+              "END_INTERVIEW",
+              "REQUEST_HUMAN_REVIEW"
+            ]
+          }
+        },
+        "forbidden_actions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required_competency_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"
+          }
+        },
+        "human_review_required": {
+          "type": "boolean"
+        },
+        "human_review_reason_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          }
+        }
+      }
+    },
+    "expectedEvaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "output_schema_version",
+        "criterion_labels",
+        "overall_score_range",
+        "minimum_confidence",
+        "required_evidence_references",
+        "human_review_required",
+        "human_review_reason_codes"
+      ],
+      "properties": {
+        "output_schema_version": {
+          "const": "1.0.0"
+        },
+        "criterion_labels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/criterionLabel"
+          }
+        },
+        "overall_score_range": {
+          "$ref": "#/$defs/range"
+        },
+        "minimum_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "required_evidence_references": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "human_review_required": {
+          "type": "boolean"
+        },
+        "human_review_reason_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          }
+        }
+      }
+    },
+    "criterionLabel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "criterion_id",
+        "applicable",
+        "score_range"
+      ],
+      "properties": {
+        "criterion_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"
+        },
+        "applicable": {
+          "type": "boolean"
+        },
+        "score_range": {
+          "$ref": "#/$defs/range"
+        }
+      }
+    },
+    "range": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum",
+        "maximum"
+      ],
+      "properties": {
+        "minimum": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "maximum": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reviewer_role",
+        "reviewed_at",
+        "notes",
+        "label_confidence"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "UNREVIEWED",
+            "TECHNICAL_REVIEWED",
+            "SECURITY_REVIEWED",
+            "FULLY_APPROVED"
+          ]
+        },
+        "reviewer_role": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "TECHNICAL_EXPERT",
+                "SECURITY_REVIEWER",
+                "PRIVACY_REVIEWER",
+                "MULTI_REVIEWER_PANEL"
+              ]
+            }
+          ]
+        },
+        "reviewed_at": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "label_confidence": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ]
+        }
+      }
+    }
+  }
+}

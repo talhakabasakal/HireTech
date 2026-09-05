@@ -1,0 +1,86 @@
+.conversation {
+  display: grid;
+  gap: 0.75rem;
+  background: var(--background);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.title p {
+  margin: 0;
+}
+
+.messages {
+  display: grid;
+  max-height: 300px;
+  gap: 0.75rem;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+  scrollbar-width: thin;
+}
+
+.message {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.message header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted-foreground);
+  font-size: 0.65rem;
+}
+
+.message header strong {
+  color: var(--secondary-foreground);
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.message p {
+  margin: 0;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--sand);
+  color: var(--secondary-foreground);
+  font-size: 0.7rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.candidate p {
+  border-color: var(--input-border);
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.empty {
+  margin: 0;
+  padding: 0.7rem;
+  border: 1px dashed var(--input-border);
+  border-radius: 7px;
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.note {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.64rem;
+  line-height: 1.4;
+}
+

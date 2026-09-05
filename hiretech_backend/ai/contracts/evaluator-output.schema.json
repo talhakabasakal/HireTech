@@ -1,0 +1,616 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hiretech.example/schemas/ai/evaluator-output/1.0.0",
+  "title": "HireTech Evaluator Output",
+  "description": "Strict evidence-based output contract for the independent evaluator LLM. The result supports human decision-making and is not a hiring decision.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evaluation_id",
+    "interview_id",
+    "rubric_id",
+    "rubric_version",
+    "criterion_scores",
+    "overall_score",
+    "overall_confidence",
+    "summary",
+    "data_quality",
+    "integrity_checks",
+    "human_review",
+    "report_disposition"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "evaluation_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "interview_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "rubric_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{1,127}$"
+    },
+    "rubric_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "criterion_scores": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "$ref": "#/$defs/criterionScore"
+      }
+    },
+    "overall_score": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      ],
+      "description": "A model-proposed aggregate. The backend must recalculate and validate it from rubric weights."
+    },
+    "overall_confidence": {
+      "$ref": "#/$defs/confidence"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "data_quality": {
+      "$ref": "#/$defs/dataQuality"
+    },
+    "integrity_checks": {
+      "$ref": "#/$defs/integrityChecks"
+    },
+    "human_review": {
+      "$ref": "#/$defs/humanReview"
+    },
+    "report_disposition": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "REVIEW_REQUIRED",
+        "READY_FOR_HUMAN_DECISION"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "report_disposition": {
+            "const": "REVIEW_REQUIRED"
+          }
+        },
+        "required": [
+          "report_disposition"
+        ]
+      },
+      "then": {
+        "properties": {
+          "human_review": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/humanReview"
+              },
+              {
+                "properties": {
+                  "required": {
+                    "const": true
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "data_quality": {
+            "properties": {
+              "sufficient_for_scoring": {
+                "const": false
+              }
+            },
+            "required": [
+              "sufficient_for_scoring"
+            ]
+          }
+        },
+        "required": [
+          "data_quality"
+        ]
+      },
+      "then": {
+        "properties": {
+          "overall_score": {
+            "type": "null"
+          },
+          "human_review": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/humanReview"
+              },
+              {
+                "properties": {
+                  "required": {
+                    "const": true
+                  }
+                }
+              }
+            ]
+          },
+          "report_disposition": {
+            "const": "REVIEW_REQUIRED"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "criterionScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "criterion_id",
+        "applicable",
+        "score",
+        "maximum_score",
+        "weight",
+        "confidence",
+        "evidence_references",
+        "rationale",
+        "limitations"
+      ],
+      "properties": {
+        "criterion_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"
+        },
+        "applicable": {
+          "type": "boolean"
+        },
+        "score": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 4,
+              "multipleOf": 0.5
+            }
+          ]
+        },
+        "maximum_score": {
+          "const": 4
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "evidence_references": {
+          "type": "array",
+          "maxItems": 30,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "rationale": {
+          "type": "string",
+          "maxLength": 3000
+        },
+        "limitations": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "applicable": {
+                "const": false
+              }
+            },
+            "required": [
+              "applicable"
+            ]
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "null"
+              },
+              "weight": {
+                "const": 0
+              },
+              "evidence_references": {
+                "maxItems": 0
+              },
+              "rationale": {
+                "minLength": 1
+              },
+              "limitations": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "applicable": {
+                "const": true
+              }
+            },
+            "required": [
+              "applicable"
+            ]
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 4,
+                "multipleOf": 0.5
+              },
+              "weight": {
+                "exclusiveMinimum": 0
+              },
+              "evidence_references": {
+                "minItems": 1
+              },
+              "rationale": {
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "score",
+        "level",
+        "reason_codes"
+      ],
+      "properties": {
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "SUFFICIENT_DIRECT_EVIDENCE",
+              "MULTIPLE_EVIDENCE_SOURCES",
+              "INCOMPLETE_INTERVIEW",
+              "MISSING_TEST_EVIDENCE",
+              "AMBIGUOUS_RESPONSE",
+              "CONTRADICTORY_EVIDENCE",
+              "LIMITED_CRITERION_COVERAGE",
+              "POSSIBLE_PROMPT_INJECTION",
+              "TOOL_PROVENANCE_UNCLEAR",
+              "OUT_OF_DISTRIBUTION_TASK"
+            ]
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assessment",
+        "strengths",
+        "development_areas",
+        "limitations"
+      ],
+      "properties": {
+        "assessment": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "strengths": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/evidenceStatement"
+          }
+        },
+        "development_areas": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/evidenceStatement"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "maxItems": 15,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      }
+    },
+    "evidenceStatement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statement",
+        "evidence_references"
+      ],
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "evidence_references": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      }
+    },
+    "dataQuality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sufficient_for_scoring",
+        "missing_evidence_types",
+        "contradiction_references",
+        "notes"
+      ],
+      "properties": {
+        "sufficient_for_scoring": {
+          "type": "boolean"
+        },
+        "missing_evidence_types": {
+          "type": "array",
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "TECHNICAL_ANSWER",
+              "CODE_ARTIFACT",
+              "TEST_RESULT",
+              "DEBUGGING_TRACE",
+              "SYSTEM_DESIGN",
+              "TRADE_OFF_EXPLANATION",
+              "COMMUNICATION_SAMPLE",
+              "AI_USAGE_EVIDENCE"
+            ]
+          }
+        },
+        "contradiction_references": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      }
+    },
+    "integrityChecks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "all_evidence_references_resolved",
+        "rubric_only_scoring",
+        "protected_attributes_excluded",
+        "interviewer_opinion_excluded",
+        "prompt_injection_detected",
+        "issue_codes"
+      ],
+      "properties": {
+        "all_evidence_references_resolved": {
+          "type": "boolean"
+        },
+        "rubric_only_scoring": {
+          "type": "boolean"
+        },
+        "protected_attributes_excluded": {
+          "type": "boolean"
+        },
+        "interviewer_opinion_excluded": {
+          "type": "boolean"
+        },
+        "prompt_injection_detected": {
+          "type": "boolean"
+        },
+        "issue_codes": {
+          "type": "array",
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "UNRESOLVED_EVIDENCE",
+              "CROSS_INTERVIEW_EVIDENCE",
+              "RUBRIC_DEVIATION",
+              "PROTECTED_ATTRIBUTE_RISK",
+              "INTERVIEWER_OPINION_CONTAMINATION",
+              "PROMPT_INJECTION",
+              "UNTRUSTED_TOOL_RESULT",
+              "SCORE_ARITHMETIC_MISMATCH"
+            ]
+          }
+        }
+      }
+    },
+    "humanReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "urgency",
+        "reason_codes",
+        "review_questions"
+      ],
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "urgency": {
+          "type": "string",
+          "enum": [
+            "NONE",
+            "NORMAL",
+            "HIGH",
+            "IMMEDIATE"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "maxItems": 15,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "LOW_CONFIDENCE",
+              "INSUFFICIENT_EVIDENCE",
+              "CONTRADICTORY_EVIDENCE",
+              "INCOMPLETE_INTERVIEW",
+              "PROMPT_INJECTION",
+              "PII_OR_SECRET_RISK",
+              "UNRESOLVED_EVIDENCE",
+              "OUT_OF_DISTRIBUTION_TASK",
+              "MODEL_DISAGREEMENT",
+              "SEVERE_NEGATIVE_ASSESSMENT",
+              "PROTECTED_ATTRIBUTE_RISK",
+              "POLICY_REQUIRED"
+            ]
+          }
+        },
+        "review_questions": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "required": {
+                "const": false
+              }
+            },
+            "required": [
+              "required"
+            ]
+          },
+          "then": {
+            "properties": {
+              "urgency": {
+                "const": "NONE"
+              },
+              "reason_codes": {
+                "maxItems": 0
+              },
+              "review_questions": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "required": {
+                "const": true
+              }
+            },
+            "required": [
+              "required"
+            ]
+          },
+          "then": {
+            "properties": {
+              "urgency": {
+                "enum": [
+                  "NORMAL",
+                  "HIGH",
+                  "IMMEDIATE"
+                ]
+              },
+              "reason_codes": {
+                "minItems": 1
+              },
+              "review_questions": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

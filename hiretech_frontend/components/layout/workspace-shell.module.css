@@ -1,0 +1,393 @@
+.sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  min-height: 620px;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.brandArea {
+  position: relative;
+  display: flex;
+  height: 64px;
+  align-items: center;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brandArea :global(.brand) {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.brandArea :global(.brand-mark) {
+  box-shadow: 0 1px 2px rgba(24, 24, 27, 0.12);
+}
+
+.collapseButton {
+  position: absolute;
+  top: 72px;
+  right: -13px;
+  z-index: 4;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--background);
+  color: var(--muted-foreground);
+  box-shadow: 0 2px 8px rgba(24, 24, 27, 0.08);
+  cursor: pointer;
+}
+
+.collapseButton:hover {
+  border-color: var(--input-border);
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.collapseButton svg {
+  width: 14px;
+  height: 14px;
+}
+
+.organization {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  margin: 12px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--sand);
+}
+
+.organizationIcon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--background);
+  color: var(--secondary-foreground);
+}
+
+.organizationCopy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.organizationCopy strong,
+.organizationCopy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.organizationCopy strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.organizationCopy span {
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+.organization > svg {
+  width: 14px;
+  color: var(--muted-foreground);
+}
+
+.navigation {
+  display: grid;
+  gap: 18px;
+  overflow-y: auto;
+  padding: 4px 12px 16px;
+  scrollbar-width: thin;
+}
+
+.group {
+  display: grid;
+  gap: 4px;
+}
+
+.groupLabel {
+  margin: 0;
+  padding: 0 8px 5px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.navItem {
+  position: relative;
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--muted-foreground);
+  font-size: 12.5px;
+  font-weight: 540;
+  white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.navItem svg {
+  width: 17px;
+  height: 17px;
+  color: #71717a;
+}
+
+.navItem:hover {
+  border-color: var(--border);
+  background: var(--sand);
+  color: var(--foreground);
+}
+
+.navItem:hover svg {
+  color: var(--foreground);
+}
+
+.navItem.active {
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--background);
+  box-shadow: 0 1px 2px rgba(24, 24, 27, 0.14);
+}
+
+.navItem.active::before {
+  content: "";
+  position: absolute;
+  left: -13px;
+  width: 3px;
+  height: 18px;
+  border-radius: 0 3px 3px 0;
+  background: var(--foreground);
+}
+
+.navItem.active svg {
+  color: var(--background);
+}
+
+.navItemLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.footer {
+  display: grid;
+  gap: 8px;
+  margin-top: auto;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.sessionStatus {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--sand);
+}
+
+.sessionStatus svg {
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  color: var(--success);
+}
+
+.sessionStatus div {
+  display: grid;
+  gap: 2px;
+}
+
+.sessionStatus strong {
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.sessionStatus span {
+  color: var(--muted-foreground);
+  font-size: 9.5px;
+}
+
+.profile {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 9px;
+  padding: 4px;
+}
+
+.avatar {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.profileCopy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.profileCopy strong,
+.profileCopy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileCopy strong {
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.profileCopy span {
+  color: var(--muted-foreground);
+  font-size: 9.5px;
+}
+
+.signOut {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+}
+
+.signOut:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.signOut svg {
+  width: 15px;
+  height: 15px;
+}
+
+.collapsed .brandArea {
+  justify-content: center;
+  padding-inline: 8px;
+}
+
+.collapsed .brandArea :global(.brand) > span:last-child,
+.collapsed .organization,
+.collapsed .groupLabel,
+.collapsed .sessionStatus,
+.collapsed .profileCopy {
+  display: none;
+}
+
+.collapsed .navigation {
+  gap: 12px;
+  padding: 14px 8px;
+}
+
+.collapsed .navItem {
+  width: 40px;
+  min-height: 40px;
+  justify-content: center;
+  gap: 0;
+  margin: 0 auto;
+  padding: 0;
+}
+
+.collapsed .navItemLabel {
+  display: none;
+}
+
+.collapsed .navItem.active::before {
+  left: -13px;
+}
+
+.collapsed .navItem::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  z-index: 60;
+  display: none;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 11px;
+  box-shadow: 0 4px 14px rgba(24, 24, 27, 0.12);
+}
+
+.collapsed .navItem:hover::after,
+.collapsed .navItem:focus-visible::after {
+  display: block;
+}
+
+.collapsed .footer {
+  padding: 10px 8px;
+}
+
+.collapsed .profile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+}
+
+.drawerNavigation {
+  display: grid;
+  gap: 18px;
+  margin-top: 14px;
+}
+
+.drawerNavigation .navItem.active::before {
+  left: -9px;
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    display: none;
+  }
+
+  .collapseButton {
+    display: none;
+  }
+
+  .drawerNavigation {
+    overflow-y: auto;
+    max-height: calc(100vh - 150px);
+    padding-bottom: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navItem {
+    transition: none;
+  }
+}

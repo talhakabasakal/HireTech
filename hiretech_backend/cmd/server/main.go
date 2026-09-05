@@ -80,10 +80,11 @@ func run() error {
 	log.Info("starting masterfabric-go",
 		"host", cfg.Server.Host,
 		"port", cfg.Server.Port,
+		"environment", cfg.Environment,
 	)
 
-	if cfg.JWT.Secret == "change-me-in-production" {
-		log.Warn("JWT_SECRET is unset; authentication uses a known default value")
+	if err := cfg.ValidateForProduction(); err != nil {
+		return fmt.Errorf("invalid production configuration: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -101,6 +102,9 @@ func run() error {
 	// Initialize PostgreSQL
 	db, err := database.NewPostgresPool(ctx, cfg.Database)
 	if err != nil {
+		if cfg.IsProduction() {
+			return fmt.Errorf("postgres is required in production: %w", err)
+		}
 		log.Warn("postgres unavailable, running without database", "error", err)
 		db = nil
 	} else {
@@ -111,6 +115,9 @@ func run() error {
 	// Initialize Redis
 	redisClient, err := cache.NewRedisClient(ctx, cfg.Redis)
 	if err != nil {
+		if cfg.IsProduction() {
+			return fmt.Errorf("redis is required in production: %w", err)
+		}
 		log.Warn("redis unavailable, running without cache", "error", err)
 		redisClient = nil
 	} else {

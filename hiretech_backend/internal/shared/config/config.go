@@ -11,16 +11,43 @@ import (
 
 // Config holds all application configuration.
 type Config struct {
-	Server    ServerConfig
-	Database  DatabaseConfig
-	Redis     RedisConfig
-	JWT       JWTConfig
-	Security  SecurityConfig
-	Email     EmailConfig
-	Kafka     KafkaConfig
-	WebSocket WebSocketConfig
-	Log       LogConfig
-	AI        AIConfig
+	Environment string
+	Server      ServerConfig
+	Database    DatabaseConfig
+	Redis       RedisConfig
+	JWT         JWTConfig
+	Security    SecurityConfig
+	Email       EmailConfig
+	Kafka       KafkaConfig
+	WebSocket   WebSocketConfig
+	Log         LogConfig
+	AI          AIConfig
+}
+
+const (
+	EnvironmentDevelopment = "development"
+	EnvironmentProduction  = "production"
+	defaultJWTSecret       = "change-me-in-production"
+)
+
+// IsProduction reports whether production-only startup safeguards apply.
+func (c *Config) IsProduction() bool {
+	return strings.EqualFold(strings.TrimSpace(c.Environment), EnvironmentProduction)
+}
+
+// ValidateForProduction rejects insecure defaults before any listener starts.
+// Development and test environments intentionally keep their existing defaults.
+func (c *Config) ValidateForProduction() error {
+	if !c.IsProduction() {
+		return nil
+	}
+	if c.JWT.Secret == defaultJWTSecret {
+		return fmt.Errorf("JWT_SECRET must be explicitly configured in production")
+	}
+	if len(strings.TrimSpace(c.JWT.Secret)) < 32 {
+		return fmt.Errorf("JWT_SECRET must contain at least 32 characters in production")
+	}
+	return nil
 }
 
 // EmailConfig controls transactional OTP delivery. Provider may be noop or smtp.
@@ -150,6 +177,7 @@ type AIModelConfig struct {
 // Load reads configuration from environment variables with sensible defaults.
 func Load() *Config {
 	return &Config{
+		Environment: envOrDefault("APP_ENV", EnvironmentDevelopment),
 		Server: ServerConfig{
 			Host:               envOrDefault("SERVER_HOST", "0.0.0.0"),
 			Port:               envOrDefaultInt("SERVER_PORT", 8080),
@@ -176,7 +204,7 @@ func Load() *Config {
 			DB:       envOrDefaultInt("REDIS_DB", 0),
 		},
 		JWT: JWTConfig{
-			Secret:             envOrDefault("JWT_SECRET", "change-me-in-production"),
+			Secret:             envOrDefault("JWT_SECRET", defaultJWTSecret),
 			Keys:               parseKeyRing(os.Getenv("JWT_KEYS")),
 			ActiveKeyID:        envOrDefault("JWT_ACTIVE_KID", "legacy"),
 			ExpirationHours:    envOrDefaultInt("JWT_EXPIRATION_HOURS", 24),

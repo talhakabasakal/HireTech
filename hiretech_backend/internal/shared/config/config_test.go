@@ -10,6 +10,7 @@ import (
 func TestLoad_Defaults(t *testing.T) {
 	cfg := Load()
 
+	assert.Equal(t, EnvironmentDevelopment, cfg.Environment)
 	assert.Equal(t, "0.0.0.0", cfg.Server.Host)
 	assert.Equal(t, 8080, cfg.Server.Port)
 	assert.Equal(t, "localhost", cfg.Database.Host)
@@ -19,6 +20,28 @@ func TestLoad_Defaults(t *testing.T) {
 	assert.Equal(t, 6379, cfg.Redis.Port)
 	assert.Equal(t, "info", cfg.Log.Level)
 	assert.Equal(t, "json", cfg.Log.Format)
+}
+
+func TestConfig_ValidateForProductionRejectsDefaultJWTSecret(t *testing.T) {
+	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{Secret: defaultJWTSecret}}
+
+	err := cfg.ValidateForProduction()
+
+	assert.EqualError(t, err, "JWT_SECRET must be explicitly configured in production")
+}
+
+func TestConfig_ValidateForProductionRejectsShortJWTSecret(t *testing.T) {
+	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{Secret: "too-short"}}
+
+	err := cfg.ValidateForProduction()
+
+	assert.EqualError(t, err, "JWT_SECRET must contain at least 32 characters in production")
+}
+
+func TestConfig_ValidateForProductionAcceptsConfiguredJWTSecret(t *testing.T) {
+	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{Secret: "a-secure-production-secret-with-32-chars"}}
+
+	assert.NoError(t, cfg.ValidateForProduction())
 }
 
 func TestLoad_EnvironmentOverrides(t *testing.T) {

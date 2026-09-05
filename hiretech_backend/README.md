@@ -284,7 +284,7 @@ For the complete trust model, accepted risks, and the **Security Controls Regist
 | **Outbound HTTP proxy** | Default `http.Client` followed redirects and had no timeout, risking custom header leakage | **No redirect following**, 30s timeout, response body capped at 1 MiB | Prevents `Authorization` or service tokens from being forwarded across hosts on redirect (CWE-522) |
 | **RBAC coverage** | JWT was required but any authenticated user could call admin routes; wildcard permissions in seed data were not honored | **`RequirePermission`** on all admin routes; wildcard-aware matching (`*`, `org:*`, `*:read`) | Ensures state-changing operations require explicit grants, not just a valid token (CWE-306) |
 | **Migration script** | `migrate.sh create NAME` did not sanitize `NAME`, allowing path traversal in filenames | Name restricted to **`[a-zA-Z0-9_]`** | Blocks `../` injection when migration files are created via automation (CWE-22) |
-| **JWT secret default** | Server started silently with `change-me-in-production` | **Startup warning** when the default signing secret is detected | Makes misconfiguration visible before production exposure |
+| **JWT secret default** | Server could start with `change-me-in-production` | **Production startup rejection** for the default or shorter-than-32-character JWT secret | Prevents a known or weak signing secret from reaching a production listener |
 | **Gateway proxy (gosec G704)** | Intentional SSRF sink for operator-configured backend URLs | Documented as an **accepted risk** in SECURITY.md with audited `#nosec` suppressions | Proxying is a core gateway feature; risk is bounded by RBAC on endpoint creation |
 
 ### Verification
@@ -307,7 +307,7 @@ Expected results on the hardened branch:
 
 Before exposing the API on a production network:
 
-1. Set a strong, random **`JWT_SECRET`** (never use the default)
+1. Set **`APP_ENV=production`** and a strong, random **`JWT_SECRET`** of at least 32 characters (never use the default)
 2. For signing-key rotation, set **`JWT_KEYS=id1:secret1,id2:secret2`** and **`JWT_ACTIVE_KID=id2`**; retain old keys only during the overlap window
 3. Set explicit **`CORS_ALLOWED_ORIGINS`** (avoid `*`)
 4. Enable **`DB_SSLMODE=require`** (or stricter)
@@ -315,12 +315,18 @@ Before exposing the API on a production network:
 6. Restrict **`/metrics`** and **`/health/*`** at the network edge
 7. Replace default database credentials in any non-local deployment
 
+When `APP_ENV=production`, the server fails before opening its HTTP listener if
+the JWT secret is insecure or PostgreSQL/Redis cannot be initialized. Local
+development keeps the existing degraded-start behavior so `./dev.sh` can still
+start the server while infrastructure is being brought up.
+
 ## Configuration
 
 All configuration is via environment variables with sensible defaults:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `APP_ENV` | `development` | Runtime environment; `production` enables fail-closed startup safeguards |
 | `SERVER_HOST` | `0.0.0.0` | Bind host |
 | `SERVER_PORT` | `8080` | Bind port |
 | `SERVER_READ_TIMEOUT_SECONDS` | `15` | HTTP read timeout |

@@ -106,7 +106,7 @@ Required validation commands:
   write and its audit record are still production gaps.
 - GraphQL subscriptions and persisted-operation allowlisting remain deferred.
 - The current platform still uses HS256. Production should use strong managed secrets immediately and move to asymmetric keys with key IDs and rotation.
-- Production startup currently tolerates unavailable PostgreSQL/Redis; production mode should fail closed when required security dependencies are unavailable.
+- Development startup tolerates unavailable PostgreSQL/Redis for local iteration; with `APP_ENV=production`, startup now fails closed when either required security dependency is unavailable.
 - Authorization-version revocation and live membership revalidation remain future hardening work.
 - Invitation hashing currently derives from the configured application secret; production should use a separately managed, rotatable invitation-key ring.
 - Retention, deletion, legal-hold, and candidate export workflows are not part of this phase.

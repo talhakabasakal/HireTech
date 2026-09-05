@@ -67,6 +67,21 @@ func TestConfig_ValidateForProductionRejectsHS256(t *testing.T) {
 	assert.EqualError(t, cfg.ValidateForProduction(), "JWT_ALGORITHM must be RS256 in production")
 }
 
+func TestAIConfig_ValidateForProductionRejectsSmoketestModel(t *testing.T) {
+	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{
+		Algorithm:     "RS256",
+		PrivateKeyPEM: "configured",
+		PublicKeys:    map[string]string{"active": "configured"},
+		ActiveKeyID:   "active",
+	}, AI: AIConfig{Enabled: true, Interviewer: AIModelConfig{BaseURL: "https://interviewer", ModelID: "model", ModelVersion: "qlora-smoketest-v1"}, Evaluator: AIModelConfig{BaseURL: "https://evaluator", ModelID: "model", ModelVersion: "reviewed-v1"}}}
+
+	assert.EqualError(t, cfg.ValidateForProduction(), "AI interviewer smoketest model cannot be enabled in production")
+}
+
+func TestAIConfig_ValidateForProductionAllowsDisabledAI(t *testing.T) {
+	assert.NoError(t, AIConfig{}.ValidateForProduction())
+}
+
 func TestLoad_EnvironmentOverrides(t *testing.T) {
 	os.Setenv("SERVER_PORT", "9090")
 	os.Setenv("DB_HOST", "db.example.com")

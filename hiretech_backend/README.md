@@ -322,6 +322,11 @@ cannot be initialized. Local
 development keeps the existing degraded-start behavior so `./dev.sh` can still
 start the server while infrastructure is being brought up.
 
+If `AI_ENABLED=true` in production, both interviewer and evaluator endpoints,
+model IDs, and reviewed model versions must be explicit; versions containing
+`smoketest` are rejected. Keep AI disabled until the reviewed artifacts and
+provider readiness checks are available.
+
 ## Configuration
 
 All configuration is via environment variables with sensible defaults:

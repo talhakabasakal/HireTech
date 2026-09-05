@@ -57,6 +57,9 @@ func (c *Config) ValidateForProduction() error {
 	if len(c.JWT.PublicKeys) == 0 || strings.TrimSpace(c.JWT.PublicKeys[c.JWT.ActiveKeyID]) == "" {
 		return fmt.Errorf("JWT_PUBLIC_KEYS must contain the active key id in production")
 	}
+	if err := c.AI.ValidateForProduction(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -185,6 +188,27 @@ type AIModelConfig struct {
 	ModelID       string
 	ModelVersion  string
 	MaxTokens     int
+}
+
+// ValidateForProduction rejects placeholder AI model configuration before the
+// service can advertise production readiness. AI may remain disabled until a
+// reviewed model artifact and provider endpoint are available.
+func (c AIConfig) ValidateForProduction() error {
+	if !c.Enabled {
+		return nil
+	}
+	for role, model := range map[string]AIModelConfig{
+		"interviewer": c.Interviewer,
+		"evaluator":   c.Evaluator,
+	} {
+		if strings.TrimSpace(model.BaseURL) == "" || strings.TrimSpace(model.ModelID) == "" || strings.TrimSpace(model.ModelVersion) == "" {
+			return fmt.Errorf("AI %s model endpoint, id, and version must be configured in production", role)
+		}
+		if strings.Contains(strings.ToLower(model.ModelVersion), "smoketest") {
+			return fmt.Errorf("AI %s smoketest model cannot be enabled in production", role)
+		}
+	}
+	return nil
 }
 
 // Load reads configuration from environment variables with sensible defaults.

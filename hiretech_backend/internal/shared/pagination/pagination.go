@@ -1,8 +1,14 @@
 package pagination
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -11,6 +17,42 @@ const (
 	MaxPerPage     = 100
 	MaxPage        = 1_000_000
 )
+
+// Cursor is the stable ordering position used by keyset pagination.
+// CreatedAt and ID together make the cursor deterministic when timestamps tie.
+type Cursor struct {
+	CreatedAt time.Time `json:"created_at"`
+	ID        uuid.UUID `json:"id"`
+}
+
+// EncodeCursor returns an opaque, URL-safe cursor for a created-at/ID pair.
+func EncodeCursor(createdAt time.Time, id uuid.UUID) (string, error) {
+	if id == uuid.Nil || createdAt.IsZero() {
+		return "", fmt.Errorf("cursor position is incomplete")
+	}
+	payload, err := json.Marshal(Cursor{CreatedAt: createdAt.UTC(), ID: id})
+	if err != nil {
+		return "", fmt.Errorf("encode cursor: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(payload), nil
+}
+
+// DecodeCursor validates and decodes an opaque keyset cursor.
+func DecodeCursor(value string) (Cursor, error) {
+	if value == "" {
+		return Cursor{}, fmt.Errorf("cursor is empty")
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return Cursor{}, fmt.Errorf("cursor is invalid")
+	}
+	var cursor Cursor
+	if err := json.Unmarshal(payload, &cursor); err != nil || cursor.ID == uuid.Nil || cursor.CreatedAt.IsZero() {
+		return Cursor{}, fmt.Errorf("cursor is invalid")
+	}
+	cursor.CreatedAt = cursor.CreatedAt.UTC()
+	return cursor, nil
+}
 
 // Params holds pagination parameters.
 type Params struct {

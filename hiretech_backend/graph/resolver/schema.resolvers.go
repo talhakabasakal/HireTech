@@ -15,6 +15,8 @@ import (
 	interviewUsecase "github.com/masterfabric-go/masterfabric/internal/application/interview/usecase"
 	aiadminModel "github.com/masterfabric-go/masterfabric/internal/domain/aiadmin/model"
 	interviewModel "github.com/masterfabric-go/masterfabric/internal/domain/interview/model"
+	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
+	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
 )
 
 // Questions is the resolver for the questions field.
@@ -408,6 +410,52 @@ func (r *queryResolver) Interviews(ctx context.Context, statuses []model.Intervi
 		result = append(result, interviewGraphQL(value))
 	}
 	return result, nil
+}
+
+// InterviewConnection is the keyset-paginated form of interviews. It keeps
+// the existing list field backward-compatible while new clients can avoid
+// offset drift and unbounded page requests.
+func (r *queryResolver) InterviewConnection(ctx context.Context, statuses []model.InterviewStatus, first *int, after *string) (*model.InterviewConnection, error) {
+	actor, err := requireActor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if r.InterviewUseCase == nil {
+		return nil, notConfigured("interview administration")
+	}
+	pageSize := 20
+	if first != nil {
+		pageSize = *first
+	}
+	var cursor *pagination.Cursor
+	if after != nil && strings.TrimSpace(*after) != "" {
+		decoded, decodeErr := pagination.DecodeCursor(*after)
+		if decodeErr != nil {
+			return nil, domainErr.New(domainErr.ErrValidation, "after cursor is invalid", decodeErr)
+		}
+		cursor = &decoded
+	}
+	domainStatuses := make([]interviewModel.Status, 0, len(statuses))
+	for _, status := range statuses {
+		domainStatuses = append(domainStatuses, interviewModel.Status(strings.ToLower(string(status))))
+	}
+	page, err := r.InterviewUseCase.ListPage(ctx, actor, domainStatuses, cursor, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	edges := make([]*model.InterviewEdge, 0, len(page.Items))
+	for _, value := range page.Items {
+		edgeCursor, cursorErr := pagination.EncodeCursor(value.CreatedAt, value.ID)
+		if cursorErr != nil {
+			return nil, domainErr.New(domainErr.ErrInternal, "failed to encode interview cursor", cursorErr)
+		}
+		edges = append(edges, &model.InterviewEdge{Cursor: edgeCursor, Node: interviewGraphQL(value)})
+	}
+	var endCursor *string
+	if page.EndCursor != "" {
+		endCursor = &page.EndCursor
+	}
+	return &model.InterviewConnection{Edges: edges, PageInfo: &model.PageInfo{HasNextPage: page.HasNextPage, EndCursor: endCursor}}, nil
 }
 
 // Interview is the resolver for the interview field.

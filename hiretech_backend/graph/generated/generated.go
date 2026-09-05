@@ -216,6 +216,16 @@ type ComplexityRoot struct {
 		Version              func(childComplexity int) int
 	}
 
+	InterviewConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
+	}
+
+	InterviewEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
 	InterviewInvitationPayload struct {
 		ExpiresAt    func(childComplexity int) int
 		InvitationID func(childComplexity int) int
@@ -259,16 +269,22 @@ type ComplexityRoot struct {
 		Status       func(childComplexity int) int
 	}
 
+	PageInfo struct {
+		EndCursor   func(childComplexity int) int
+		HasNextPage func(childComplexity int) int
+	}
+
 	Query struct {
-		AdminWorkspace   func(childComplexity int) int
-		Answer           func(childComplexity int, id uuid.UUID) int
-		EvaluationReport func(childComplexity int, interviewID uuid.UUID) int
-		Interview        func(childComplexity int, id uuid.UUID) int
-		Interviews       func(childComplexity int, statuses []model.InterviewStatus, limit *int) int
-		Me               func(childComplexity int) int
-		Organizations    func(childComplexity int) int
-		Question         func(childComplexity int, id uuid.UUID) int
-		QuestionDraft    func(childComplexity int, id uuid.UUID) int
+		AdminWorkspace      func(childComplexity int) int
+		Answer              func(childComplexity int, id uuid.UUID) int
+		EvaluationReport    func(childComplexity int, interviewID uuid.UUID) int
+		Interview           func(childComplexity int, id uuid.UUID) int
+		InterviewConnection func(childComplexity int, statuses []model.InterviewStatus, first *int, after *string) int
+		Interviews          func(childComplexity int, statuses []model.InterviewStatus, limit *int) int
+		Me                  func(childComplexity int) int
+		Organizations       func(childComplexity int) int
+		Question            func(childComplexity int, id uuid.UUID) int
+		QuestionDraft       func(childComplexity int, id uuid.UUID) int
 	}
 
 	Question struct {
@@ -351,6 +367,7 @@ type QueryResolver interface {
 	Me(ctx context.Context) (*model.User, error)
 	Organizations(ctx context.Context) ([]*model.OrganizationMembership, error)
 	Interviews(ctx context.Context, statuses []model.InterviewStatus, limit *int) ([]*model.Interview, error)
+	InterviewConnection(ctx context.Context, statuses []model.InterviewStatus, first *int, after *string) (*model.InterviewConnection, error)
 	Interview(ctx context.Context, id uuid.UUID) (*model.Interview, error)
 	Question(ctx context.Context, id uuid.UUID) (*model.Question, error)
 	Answer(ctx context.Context, id uuid.UUID) (*model.Answer, error)
@@ -1142,6 +1159,32 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Interview.Version(childComplexity), true
 
+	case "InterviewConnection.edges":
+		if e.complexity.InterviewConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.InterviewConnection.Edges(childComplexity), true
+	case "InterviewConnection.pageInfo":
+		if e.complexity.InterviewConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.InterviewConnection.PageInfo(childComplexity), true
+
+	case "InterviewEdge.cursor":
+		if e.complexity.InterviewEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.InterviewEdge.Cursor(childComplexity), true
+	case "InterviewEdge.node":
+		if e.complexity.InterviewEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.InterviewEdge.Node(childComplexity), true
+
 	case "InterviewInvitationPayload.expiresAt":
 		if e.complexity.InterviewInvitationPayload.ExpiresAt == nil {
 			break
@@ -1437,6 +1480,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.OrganizationMembership.Status(childComplexity), true
 
+	case "PageInfo.endCursor":
+		if e.complexity.PageInfo.EndCursor == nil {
+			break
+		}
+
+		return e.complexity.PageInfo.EndCursor(childComplexity), true
+	case "PageInfo.hasNextPage":
+		if e.complexity.PageInfo.HasNextPage == nil {
+			break
+		}
+
+		return e.complexity.PageInfo.HasNextPage(childComplexity), true
+
 	case "Query.adminWorkspace":
 		if e.complexity.Query.AdminWorkspace == nil {
 			break
@@ -1476,6 +1532,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Interview(childComplexity, args["id"].(uuid.UUID)), true
+	case "Query.interviewConnection":
+		if e.complexity.Query.InterviewConnection == nil {
+			break
+		}
+
+		args, err := ec.field_Query_interviewConnection_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.InterviewConnection(childComplexity, args["statuses"].([]model.InterviewStatus), args["first"].(*int), args["after"].(*string)), true
 	case "Query.interviews":
 		if e.complexity.Query.Interviews == nil {
 			break
@@ -2135,6 +2202,21 @@ type Interview {
   updatedAt: DateTime!
 }
 
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+type InterviewEdge {
+  cursor: String!
+  node: Interview!
+}
+
+type InterviewConnection {
+  edges: [InterviewEdge!]!
+  pageInfo: PageInfo!
+}
+
 type Question {
   id: UUID!
   interviewId: UUID!
@@ -2300,6 +2382,7 @@ type Query {
   me: User!
   organizations: [OrganizationMembership!]!
   interviews(statuses: [InterviewStatus!], limit: Int = 50): [Interview!]!
+  interviewConnection(statuses: [InterviewStatus!], first: Int = 20, after: String): InterviewConnection!
   interview(id: UUID!): Interview
   question(id: UUID!): Question
   answer(id: UUID!): Answer
@@ -2625,6 +2708,27 @@ func (ec *executionContext) field_Query_evaluationReport_args(ctx context.Contex
 		return nil, err
 	}
 	args["interviewId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_interviewConnection_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "statuses", ec.unmarshalOInterviewStatus2ᚕgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewStatusᚄ)
+	if err != nil {
+		return nil, err
+	}
+	args["statuses"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg2
 	return args, nil
 }
 
@@ -6592,6 +6696,184 @@ func (ec *executionContext) fieldContext_Interview_updatedAt(_ context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _InterviewConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.InterviewConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_InterviewConnection_edges,
+		func(ctx context.Context) (any, error) {
+			return obj.Edges, nil
+		},
+		nil,
+		ec.marshalNInterviewEdge2ᚕᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewEdgeᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_InterviewConnection_edges(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterviewConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "cursor":
+				return ec.fieldContext_InterviewEdge_cursor(ctx, field)
+			case "node":
+				return ec.fieldContext_InterviewEdge_node(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type InterviewEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _InterviewConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.InterviewConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_InterviewConnection_pageInfo,
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		ec.marshalNPageInfo2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐPageInfo,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_InterviewConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterviewConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _InterviewEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.InterviewEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_InterviewEdge_cursor,
+		func(ctx context.Context) (any, error) {
+			return obj.Cursor, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_InterviewEdge_cursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterviewEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _InterviewEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.InterviewEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_InterviewEdge_node,
+		func(ctx context.Context) (any, error) {
+			return obj.Node, nil
+		},
+		nil,
+		ec.marshalNInterview2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterview,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_InterviewEdge_node(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterviewEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Interview_id(ctx, field)
+			case "organizationId":
+				return ec.fieldContext_Interview_organizationId(ctx, field)
+			case "candidateUserId":
+				return ec.fieldContext_Interview_candidateUserId(ctx, field)
+			case "candidateEmail":
+				return ec.fieldContext_Interview_candidateEmail(ctx, field)
+			case "candidateDisplayName":
+				return ec.fieldContext_Interview_candidateDisplayName(ctx, field)
+			case "title":
+				return ec.fieldContext_Interview_title(ctx, field)
+			case "positionTitle":
+				return ec.fieldContext_Interview_positionTitle(ctx, field)
+			case "seniority":
+				return ec.fieldContext_Interview_seniority(ctx, field)
+			case "technologyTags":
+				return ec.fieldContext_Interview_technologyTags(ctx, field)
+			case "mode":
+				return ec.fieldContext_Interview_mode(ctx, field)
+			case "language":
+				return ec.fieldContext_Interview_language(ctx, field)
+			case "questionSource":
+				return ec.fieldContext_Interview_questionSource(ctx, field)
+			case "rubricVersion":
+				return ec.fieldContext_Interview_rubricVersion(ctx, field)
+			case "status":
+				return ec.fieldContext_Interview_status(ctx, field)
+			case "startsAt":
+				return ec.fieldContext_Interview_startsAt(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_Interview_expiresAt(ctx, field)
+			case "startedAt":
+				return ec.fieldContext_Interview_startedAt(ctx, field)
+			case "completedAt":
+				return ec.fieldContext_Interview_completedAt(ctx, field)
+			case "cancelledAt":
+				return ec.fieldContext_Interview_cancelledAt(ctx, field)
+			case "version":
+				return ec.fieldContext_Interview_version(ctx, field)
+			case "questions":
+				return ec.fieldContext_Interview_questions(ctx, field)
+			case "answers":
+				return ec.fieldContext_Interview_answers(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Interview_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Interview_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Interview", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _InterviewInvitationPayload_invitationId(ctx context.Context, field graphql.CollectedField, obj *model.InterviewInvitationPayload) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8343,6 +8625,64 @@ func (ec *executionContext) fieldContext_OrganizationMembership_status(_ context
 	return fc, nil
 }
 
+func (ec *executionContext) _PageInfo_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PageInfo_hasNextPage,
+		func(ctx context.Context) (any, error) {
+			return obj.HasNextPage, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PageInfo_hasNextPage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PageInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PageInfo_endCursor(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PageInfo_endCursor,
+		func(ctx context.Context) (any, error) {
+			return obj.EndCursor, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PageInfo_endCursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PageInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_me(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8508,6 +8848,53 @@ func (ec *executionContext) fieldContext_Query_interviews(ctx context.Context, f
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_interviews_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_interviewConnection(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_interviewConnection,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().InterviewConnection(ctx, fc.Args["statuses"].([]model.InterviewStatus), fc.Args["first"].(*int), fc.Args["after"].(*string))
+		},
+		nil,
+		ec.marshalNInterviewConnection2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewConnection,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_interviewConnection(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_InterviewConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_InterviewConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type InterviewConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_interviewConnection_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -13320,6 +13707,94 @@ func (ec *executionContext) _Interview(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var interviewConnectionImplementors = []string{"InterviewConnection"}
+
+func (ec *executionContext) _InterviewConnection(ctx context.Context, sel ast.SelectionSet, obj *model.InterviewConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, interviewConnectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InterviewConnection")
+		case "edges":
+			out.Values[i] = ec._InterviewConnection_edges(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pageInfo":
+			out.Values[i] = ec._InterviewConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var interviewEdgeImplementors = []string{"InterviewEdge"}
+
+func (ec *executionContext) _InterviewEdge(ctx context.Context, sel ast.SelectionSet, obj *model.InterviewEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, interviewEdgeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InterviewEdge")
+		case "cursor":
+			out.Values[i] = ec._InterviewEdge_cursor(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "node":
+			out.Values[i] = ec._InterviewEdge_node(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var interviewInvitationPayloadImplementors = []string{"InterviewInvitationPayload"}
 
 func (ec *executionContext) _InterviewInvitationPayload(ctx context.Context, sel ast.SelectionSet, obj *model.InterviewInvitationPayload) graphql.Marshaler {
@@ -13661,6 +14136,47 @@ func (ec *executionContext) _OrganizationMembership(ctx context.Context, sel ast
 	return out
 }
 
+var pageInfoImplementors = []string{"PageInfo"}
+
+func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet, obj *model.PageInfo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pageInfoImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PageInfo")
+		case "hasNextPage":
+			out.Values[i] = ec._PageInfo_hasNextPage(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "endCursor":
+			out.Values[i] = ec._PageInfo_endCursor(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -13734,6 +14250,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_interviews(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "interviewConnection":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_interviewConnection(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -15342,6 +15880,74 @@ func (ec *executionContext) marshalNInterview2ᚖgithubᚗcomᚋmasterfabricᚑg
 	return ec._Interview(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNInterviewConnection2githubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewConnection(ctx context.Context, sel ast.SelectionSet, v model.InterviewConnection) graphql.Marshaler {
+	return ec._InterviewConnection(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNInterviewConnection2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewConnection(ctx context.Context, sel ast.SelectionSet, v *model.InterviewConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._InterviewConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNInterviewEdge2ᚕᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewEdgeᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.InterviewEdge) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNInterviewEdge2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNInterviewEdge2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewEdge(ctx context.Context, sel ast.SelectionSet, v *model.InterviewEdge) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._InterviewEdge(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNInterviewInvitationPayload2githubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewInvitationPayload(ctx context.Context, sel ast.SelectionSet, v model.InterviewInvitationPayload) graphql.Marshaler {
 	return ec._InterviewInvitationPayload(ctx, sel, &v)
 }
@@ -15468,6 +16074,16 @@ func (ec *executionContext) unmarshalNOrganizationStatus2githubᚗcomᚋmasterfa
 
 func (ec *executionContext) marshalNOrganizationStatus2githubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐOrganizationStatus(ctx context.Context, sel ast.SelectionSet, v model.OrganizationStatus) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *model.PageInfo) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PageInfo(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNPublishAdminRubricInput2githubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐPublishAdminRubricInput(ctx context.Context, v any) (model.PublishAdminRubricInput, error) {

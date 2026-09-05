@@ -14,6 +14,7 @@ import (
 	interviewModel "github.com/masterfabric-go/masterfabric/internal/domain/interview/model"
 	"github.com/masterfabric-go/masterfabric/internal/shared/authcontext"
 	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
+	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
 )
 
 var errUnexpectedRepositoryCall = errors.New("unexpected repository call")
@@ -23,6 +24,7 @@ type interviewRepositoryStub struct {
 	createdAudit     interviewModel.AuditEvent
 	get              func(uuid.UUID, uuid.UUID) (*interviewModel.Interview, error)
 	getQuestion      func(uuid.UUID, uuid.UUID) (*interviewModel.Question, error)
+	listPage         func(*pagination.Cursor, int) ([]*interviewModel.Interview, error)
 	redeem           func(string, uuid.UUID, uuid.UUID, string, *interviewModel.Consent, interviewModel.AuditEvent) (*interviewModel.Interview, error)
 	start            func(*interviewModel.Session, int, interviewModel.AuditEvent) (*interviewModel.Interview, error)
 	submit           func(*interviewModel.Answer, interviewModel.AuditEvent) (*interviewModel.Answer, error)
@@ -40,6 +42,12 @@ func (r *interviewRepositoryStub) Get(_ context.Context, organizationID, intervi
 }
 func (r *interviewRepositoryStub) List(context.Context, uuid.UUID, []interviewModel.Status, int) ([]*interviewModel.Interview, error) {
 	return nil, errUnexpectedRepositoryCall
+}
+func (r *interviewRepositoryStub) ListPage(_ context.Context, _ uuid.UUID, _ []interviewModel.Status, after *pagination.Cursor, limit int) ([]*interviewModel.Interview, error) {
+	if r.listPage == nil {
+		return nil, errUnexpectedRepositoryCall
+	}
+	return r.listPage(after, limit)
 }
 func (r *interviewRepositoryStub) AddQuestion(context.Context, *interviewModel.Question, int, interviewModel.AuditEvent) error {
 	return errUnexpectedRepositoryCall
@@ -133,6 +141,46 @@ func TestCreateUsesTrustedTenantAndPermission(t *testing.T) {
 	_, err = service.Create(context.Background(), actor, input)
 	assert.ErrorIs(t, err, domainErr.ErrForbidden)
 	assert.Same(t, created, repository.createdInterview)
+}
+
+func TestListPageUsesBoundedKeysetCursor(t *testing.T) {
+	organizationID := uuid.New()
+	firstID, secondID, thirdID := uuid.New(), uuid.New(), uuid.New()
+	firstCreated := time.Date(2026, 9, 5, 12, 0, 0, 0, time.UTC)
+	secondCreated := firstCreated.Add(-time.Minute)
+	thirdCreated := secondCreated.Add(-time.Minute)
+	repository := &interviewRepositoryStub{}
+	repository.listPage = func(after *pagination.Cursor, limit int) ([]*interviewModel.Interview, error) {
+		assert.Nil(t, after)
+		assert.Equal(t, 3, limit)
+		return []*interviewModel.Interview{
+			{ID: firstID, OrganizationID: organizationID, CreatedAt: firstCreated},
+			{ID: secondID, OrganizationID: organizationID, CreatedAt: secondCreated},
+			{ID: thirdID, OrganizationID: organizationID, CreatedAt: thirdCreated},
+		}, nil
+	}
+	service := NewInterviewService(repository, &authServiceStub{}, "secret")
+	actor := authcontext.ActorContext{UserID: uuid.New(), OrganizationID: organizationID, TokenClass: authcontext.TokenClassTenant, Permissions: []string{"interview:read"}}
+
+	page, err := service.ListPage(context.Background(), actor, nil, nil, 2)
+	require.NoError(t, err)
+	assert.Len(t, page.Items, 2)
+	assert.True(t, page.HasNextPage)
+	assert.NotEmpty(t, page.EndCursor)
+
+	cursor, err := pagination.DecodeCursor(page.EndCursor)
+	require.NoError(t, err)
+	assert.Equal(t, secondID, cursor.ID)
+	assert.Equal(t, secondCreated, cursor.CreatedAt)
+}
+
+func TestListPageRejectsUnboundedSizeAndInvalidCursor(t *testing.T) {
+	repository := &interviewRepositoryStub{}
+	service := NewInterviewService(repository, &authServiceStub{}, "secret")
+	actor := authcontext.ActorContext{UserID: uuid.New(), OrganizationID: uuid.New(), TokenClass: authcontext.TokenClassTenant, Permissions: []string{"interview:read"}}
+
+	_, err := service.ListPage(context.Background(), actor, nil, nil, 101)
+	assert.ErrorIs(t, err, domainErr.ErrValidation)
 }
 
 func TestRedeemRequiresVerifiedSessionAndIssuesInterviewScopedToken(t *testing.T) {

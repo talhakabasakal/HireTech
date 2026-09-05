@@ -14,7 +14,8 @@ Identity operations remain available:
 
 Phase 4 and Phase 5 add:
 
-- Queries: `interviews`, `interview`, `question`, and `answer`.
+- Queries: `interviews`, keyset-paginated `interviewConnection`, `interview`,
+  `question`, and `answer`.
 - Tenant mutations: `createInterview`, `addQuestion`, `publishInterview`, `createInterviewInvitation`, and `cancelInterview`.
 - Candidate bootstrap mutation: `redeemInterviewInvitation`.
 - Candidate-interview mutations: `startInterview`, `submitAnswer`, and `completeInterview`.
@@ -28,6 +29,12 @@ Phase 4 and Phase 5 add:
   immutable configuration-version, and restricted audit projections.
 
 The schema remains source-controlled at `graph/schema.graphqls`; gqlgen transport code is generated under `graph/generated` and `graph/model`. Resolvers are thin adapters over application services.
+
+`interviewConnection` uses an opaque base64url cursor containing the stable
+`created_at,id` ordering position. It fetches at most `first + 1` rows, caps
+`first` at 100, and keeps the existing `interviews(limit:)` field for backward
+compatibility. Invalid cursors and out-of-range page sizes fail with
+`VALIDATION_FAILED`.
 
 ## Domain and lifecycle
 

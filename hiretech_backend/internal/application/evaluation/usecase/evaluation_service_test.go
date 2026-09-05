@@ -17,6 +17,7 @@ import (
 	interviewRepo "github.com/masterfabric-go/masterfabric/internal/domain/interview/repository"
 	"github.com/masterfabric-go/masterfabric/internal/shared/authcontext"
 	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
+	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
 )
 
 type evaluationInterviewStub struct {
@@ -32,6 +33,9 @@ func (s *evaluationInterviewStub) Get(context.Context, uuid.UUID, uuid.UUID) (*i
 	return s.interview, nil
 }
 func (s *evaluationInterviewStub) List(context.Context, uuid.UUID, []interviewModel.Status, int) ([]*interviewModel.Interview, error) {
+	return nil, nil
+}
+func (s *evaluationInterviewStub) ListPage(context.Context, uuid.UUID, []interviewModel.Status, *pagination.Cursor, int) ([]*interviewModel.Interview, error) {
 	return nil, nil
 }
 func (s *evaluationInterviewStub) AddQuestion(context.Context, *interviewModel.Question, int, interviewModel.AuditEvent) error {

@@ -220,6 +220,16 @@ type Interview struct {
 	UpdatedAt            time.Time         `json:"updatedAt"`
 }
 
+type InterviewConnection struct {
+	Edges    []*InterviewEdge `json:"edges"`
+	PageInfo *PageInfo        `json:"pageInfo"`
+}
+
+type InterviewEdge struct {
+	Cursor string     `json:"cursor"`
+	Node   *Interview `json:"node"`
+}
+
 type InterviewInvitationPayload struct {
 	InvitationID uuid.UUID `json:"invitationId"`
 	Token        string    `json:"token"`
@@ -240,6 +250,11 @@ type Organization struct {
 type OrganizationMembership struct {
 	Organization *Organization    `json:"organization"`
 	Status       MembershipStatus `json:"status"`
+}
+
+type PageInfo struct {
+	HasNextPage bool    `json:"hasNextPage"`
+	EndCursor   *string `json:"endCursor,omitempty"`
 }
 
 type PublishAdminRubricInput struct {

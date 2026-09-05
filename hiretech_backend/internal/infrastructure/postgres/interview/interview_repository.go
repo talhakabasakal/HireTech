@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	interviewModel "github.com/masterfabric-go/masterfabric/internal/domain/interview/model"
 	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
+	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
 )
 
 const interviewColumns = `id,organization_id,created_by,candidate_user_id,candidate_email,candidate_display_name,title,position_title,seniority,technology_tags,mode,language,question_source,rubric_version,status,starts_at,expires_at,started_at,completed_at,cancelled_at,version,created_at,updated_at`
@@ -84,6 +86,45 @@ func (r *Repository) List(ctx context.Context, organizationID uuid.UUID, statuse
 		result = append(result, value)
 	}
 	return result, rows.Err()
+}
+
+func (r *Repository) ListPage(ctx context.Context, organizationID uuid.UUID, statuses []interviewModel.Status, after *pagination.Cursor, limit int) ([]*interviewModel.Interview, error) {
+	if limit <= 0 {
+		return []*interviewModel.Interview{}, nil
+	}
+	args := []any{organizationID}
+	where := "organization_id=$1"
+	if len(statuses) > 0 {
+		statusValues := make([]string, len(statuses))
+		for index, status := range statuses {
+			statusValues[index] = string(status)
+		}
+		args = append(args, statusValues)
+		where += fmt.Sprintf(" AND status=ANY($%d)", len(args))
+	}
+	if after != nil {
+		args = append(args, after.CreatedAt, after.ID)
+		where += fmt.Sprintf(" AND (created_at,id) < ($%d,$%d)", len(args)-1, len(args))
+	}
+	args = append(args, limit)
+	query := fmt.Sprintf("SELECT %s FROM interviews WHERE %s ORDER BY created_at DESC,id DESC LIMIT $%d", interviewColumns, where, len(args))
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, domainErr.New(domainErr.ErrInternal, "failed to list interview page", err)
+	}
+	defer rows.Close()
+	result := make([]*interviewModel.Interview, 0, limit)
+	for rows.Next() {
+		value, scanErr := scanInterview(rows)
+		if scanErr != nil {
+			return nil, domainErr.New(domainErr.ErrInternal, "failed to scan interview page", scanErr)
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, domainErr.New(domainErr.ErrInternal, "failed to iterate interview page", err)
+	}
+	return result, nil
 }
 
 func (r *Repository) AddQuestion(ctx context.Context, question *interviewModel.Question, expectedVersion int, audit interviewModel.AuditEvent) (err error) {

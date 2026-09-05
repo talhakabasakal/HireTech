@@ -16,6 +16,7 @@ import (
 	interviewRepo "github.com/masterfabric-go/masterfabric/internal/domain/interview/repository"
 	"github.com/masterfabric-go/masterfabric/internal/shared/authcontext"
 	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
+	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
 )
 
 type CreateInterviewInput struct {
@@ -129,6 +130,42 @@ func (s *InterviewService) List(ctx context.Context, actor authcontext.ActorCont
 		limit = 50
 	}
 	return s.repo.List(ctx, actor.OrganizationID, statuses, limit)
+}
+
+// InterviewPage is a bounded keyset-paginated interview result.
+type InterviewPage struct {
+	Items       []*interviewModel.Interview
+	HasNextPage bool
+	EndCursor   string
+}
+
+// ListPage returns tenant-scoped interviews after an opaque cursor. The
+// repository fetches one extra item so the service can determine whether a
+// next page exists without an unbounded count query.
+func (s *InterviewService) ListPage(ctx context.Context, actor authcontext.ActorContext, statuses []interviewModel.Status, after *pagination.Cursor, first int) (InterviewPage, error) {
+	if err := requireTenantPermission(actor, "interview:read"); err != nil {
+		return InterviewPage{}, err
+	}
+	if first <= 0 || first > 100 {
+		return InterviewPage{}, domainErr.New(domainErr.ErrValidation, "first must be between 1 and 100", nil)
+	}
+	values, err := s.repo.ListPage(ctx, actor.OrganizationID, statuses, after, first+1)
+	if err != nil {
+		return InterviewPage{}, err
+	}
+	page := InterviewPage{Items: values}
+	if len(values) > first {
+		page.HasNextPage = true
+		page.Items = values[:first]
+	}
+	if len(page.Items) > 0 {
+		last := page.Items[len(page.Items)-1]
+		page.EndCursor, err = pagination.EncodeCursor(last.CreatedAt, last.ID)
+		if err != nil {
+			return InterviewPage{}, domainErr.New(domainErr.ErrInternal, "failed to encode interview cursor", err)
+		}
+	}
+	return page, nil
 }
 
 func (s *InterviewService) Get(ctx context.Context, actor authcontext.ActorContext, id uuid.UUID) (*interviewModel.Interview, error) {

@@ -274,6 +274,21 @@ type Interview {
   updatedAt: DateTime!
 }
 
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+type InterviewEdge {
+  cursor: String!
+  node: Interview!
+}
+
+type InterviewConnection {
+  edges: [InterviewEdge!]!
+  pageInfo: PageInfo!
+}
+
 type Question {
   id: UUID!
   interviewId: UUID!
@@ -439,6 +454,7 @@ type Query {
   me: User!
   organizations: [OrganizationMembership!]!
   interviews(statuses: [InterviewStatus!], limit: Int = 50): [Interview!]!
+  interviewConnection(statuses: [InterviewStatus!], first: Int = 20, after: String): InterviewConnection!
   interview(id: UUID!): Interview
   question(id: UUID!): Question
   answer(id: UUID!): Answer

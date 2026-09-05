@@ -33,7 +33,7 @@ Status values:
 | Existing WebSocket compatibility | Organization/app domain-event stream exists | Remain available; do not overload it with candidate chat semantics | Implemented; protect with tests | 0 onward |
 | GraphQL schema lifecycle | Source-controlled schema and generated gqlgen transport/model code | Schema-first source, generated code, linting, registry, breaking-change gate | Partial | 0–1 |
 | GraphQL error contract | Sanitized errors with stable codes and request ID | Sanitized GraphQL errors with stable `extensions.code` and request ID | Implemented; expand contract tests | 0 onward |
-| GraphQL pagination | REST page/per-page | Opaque cursor connections with bounded page size | Missing | 1 |
+| GraphQL pagination | `interviewConnection` now provides an opaque keyset cursor with `first` capped at 100; legacy list fields remain | Opaque cursor connections across remaining list surfaces, bounded page size | Partial | Extend to audit/admin connections |
 | GraphQL request limits | Body, operation, depth, node, alias, fragment, complexity, introspection, and timeout limits | Same controls with regression coverage | Implemented; protect with tests | 0 onward |
 | Resolver batching | None | Request-scoped, tenant-keyed DataLoaders | Missing | 1 |
 | Persisted operations | Optional fail-closed SHA-256 allowlist gate and frontend hash emission are implemented; disabled until a reviewed manifest is provisioned | Production frontend allowlist after schema stabilization | Partial | Provision reviewed hashes and enable in production |
@@ -84,7 +84,7 @@ The mappings below show which existing use cases may be reused. They do not auth
 | Organizations | Organization and membership persistence; RBAC | Safe membership listing, owner bootstrap, tenant-token issuance | `myOrganizations`, `currentOrganization`, `selectOrganization` | Session and authorization service |
 | OTP | None | Challenge, hash, purpose, expiry, attempts, resend, delivery, rate limits, consumption | Registration/login/device/deletion challenge mutations | Email adapter, Redis/PostgreSQL, audit |
 | Devices | None | Public keys, challenges, signatures, trust/revoke/last seen | `myDevices`, registration and revocation mutations | OTP, session service, secure client storage |
-| Interviews | None | Interview aggregate, lifecycle, invitation, consent, candidate scope | `interviews`, `interview`, create/publish/start/complete | Tenant identity, audit |
+| Interviews | Interview aggregate, lifecycle, invitation, consent, candidate scope, keyset-paginated connection | Interview aggregate, lifecycle, invitation, consent, candidate scope | `interviews`, `interviewConnection`, `interview`, create/publish/start/complete | Tenant identity, audit |
 | Questions | None | Types, competencies, ordering, difficulty, immutable publication | `question`, `addQuestion`, interview connection | Interview lifecycle, rubric |
 | Answers | None | Text/code versions, idempotency, submission status, evidence links | `answer`, `submitAnswer` | Candidate token, object storage, sandbox later |
 | Realtime interview | Generic domain event stream | Candidate-safe events, authorization on subscribe, reconnect cursor | `interviewUpdated` | Event bus, subscription transport |

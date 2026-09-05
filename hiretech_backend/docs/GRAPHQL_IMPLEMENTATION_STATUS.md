@@ -128,7 +128,7 @@ Required validation commands:
 - `go vet ./...`
 - `go test ./...`
 - `go test -race ./...`
-- `make test-integration INTERVIEW_TEST_DSN=postgres://...` (requires an isolated migrated PostgreSQL database; fails when the DSN is absent)
+- `make test-integration INTERVIEW_TEST_DSN=postgres://... REDIS_TEST_ADDR=127.0.0.1:6379` (requires isolated, reachable PostgreSQL and Redis services; fails when either target is absent)
 
 ## Known limitations and production prerequisites
 
@@ -158,7 +158,7 @@ Required validation commands:
   provenance verification. External runner deployment, key-ring verification,
   artifact retention, and interoperability evidence remain release gates.
 - Retention, deletion, legal-hold, and candidate export workflows are not part of this phase.
-- The PostgreSQL integration test requires an isolated migrated test database. The explicit `make test-integration` gate fails when `INTERVIEW_TEST_DSN` is absent; invoking `go test ./...` directly still skips that environment-gated test by design.
+- The integration gate exercises the complete PostgreSQL interview/evaluation/audit lifecycle and the shared Redis rate limiter against real services. It fails when `INTERVIEW_TEST_DSN` or `REDIS_TEST_ADDR` is absent; invoking `go test ./...` directly still skips those environment-gated tests by design.
 
 ## Model-serving prerequisite and next phase
 

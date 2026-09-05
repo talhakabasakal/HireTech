@@ -1,4 +1,4 @@
-.PHONY: build run test test-integration lint migrate migrate-down docker-up docker-down clean help
+.PHONY: build run test test-integration test-integration-postgres test-integration-redis lint migrate migrate-down docker-up docker-down clean help
 
 APP_NAME := masterfabric
 BUILD_DIR := bin
@@ -28,10 +28,18 @@ test:
 	@echo "Running tests..."
 	go test -v -race -count=1 ./...
 
-## test-integration: Run the PostgreSQL lifecycle integration test (requires an isolated DSN)
-test-integration:
+## test-integration: Run the real PostgreSQL and Redis integration gates
+test-integration: test-integration-postgres test-integration-redis
+
+## test-integration-postgres: Run the PostgreSQL lifecycle integration test (requires an isolated DSN)
+test-integration-postgres:
 	@test -n "$(INTERVIEW_TEST_DSN)" || (echo "INTERVIEW_TEST_DSN is required; refusing to report a skipped integration test as success" >&2; exit 1)
 	INTERVIEW_TEST_DSN="$(INTERVIEW_TEST_DSN)" go test -count=1 ./internal/infrastructure/postgres/interview -run '^TestInterviewLifecyclePostgres$$'
+
+## test-integration-redis: Run the shared Redis rate-limit integration test
+test-integration-redis:
+	@test -n "$(REDIS_TEST_ADDR)" || (echo "REDIS_TEST_ADDR is required; refusing to report a skipped integration test as success" >&2; exit 1)
+	REDIS_TEST_ADDR="$(REDIS_TEST_ADDR)" go test -count=1 ./internal/application/iam/usecase -run '^TestRedisRateLimiterIntegration$$'
 
 ## test-cover: Run tests with coverage
 test-cover:

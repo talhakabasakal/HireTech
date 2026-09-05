@@ -70,38 +70,47 @@ func (r *AuditRepo) RelayPending(ctx context.Context, limit int) (count int, err
 	if err != nil {
 		return 0, domainErr.New(domainErr.ErrInternal, "failed to read pending audit events", err)
 	}
-	defer rows.Close()
-
+	type pendingAuditEvent struct {
+		id, organizationID, resourceID uuid.UUID
+		action, resourceType           string
+		payload                        []byte
+		occurredAt                     time.Time
+	}
+	pending := make([]pendingAuditEvent, 0, limit)
 	for rows.Next() {
-		var (
-			id, organizationID, resourceID uuid.UUID
-			action, resourceType           string
-			payload                        []byte
-			occurredAt                     time.Time
-		)
-		if err = rows.Scan(&id, &organizationID, &action, &resourceType, &resourceID, &payload, &occurredAt); err != nil {
+		var event pendingAuditEvent
+		if err = rows.Scan(&event.id, &event.organizationID, &event.action, &event.resourceType, &event.resourceID, &event.payload, &event.occurredAt); err != nil {
+			rows.Close()
 			return 0, domainErr.New(domainErr.ErrInternal, "failed to scan pending audit event", err)
 		}
+		pending = append(pending, event)
+	}
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return 0, domainErr.New(domainErr.ErrInternal, "failed to iterate pending audit events", err)
+	}
+	// pgx does not allow another command on a connection while query rows are
+	// open. Materialize the bounded batch and close it before projecting; the
+	// row locks remain held by this transaction until commit.
+	rows.Close()
 
-		userID, requestID := auditActorAndRequest(payload)
+	for _, event := range pending {
+		userID, requestID := auditActorAndRequest(event.payload)
 		_, err = tx.Exec(ctx, `
 			INSERT INTO audit_logs (id, organization_id, user_id, request_id, action, resource_type, resource_id, metadata, created_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 			ON CONFLICT (id) DO NOTHING`,
-			id, organizationID, userID, requestID, action, resourceType, resourceID.String(), payload, occurredAt,
+			event.id, event.organizationID, userID, requestID, event.action, event.resourceType, event.resourceID.String(), event.payload, event.occurredAt,
 		)
 		if err != nil {
 			return 0, domainErr.New(domainErr.ErrInternal, "failed to project audit event", err)
 		}
 
-		_, err = tx.Exec(ctx, `UPDATE audit_outbox SET published_at=$2 WHERE id=$1 AND published_at IS NULL`, id, time.Now().UTC())
+		_, err = tx.Exec(ctx, `UPDATE audit_outbox SET published_at=$2 WHERE id=$1 AND published_at IS NULL`, event.id, time.Now().UTC())
 		if err != nil {
 			return 0, domainErr.New(domainErr.ErrInternal, "failed to mark audit event published", err)
 		}
 		count++
-	}
-	if err = rows.Err(); err != nil {
-		return 0, domainErr.New(domainErr.ErrInternal, "failed to iterate pending audit events", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return 0, domainErr.New(domainErr.ErrInternal, "failed to commit audit outbox relay", err)

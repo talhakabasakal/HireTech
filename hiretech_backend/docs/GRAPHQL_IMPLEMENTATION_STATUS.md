@@ -113,6 +113,7 @@ Required validation commands:
 - `go vet ./...`
 - `go test ./...`
 - `go test -race ./...`
+- `make test-integration INTERVIEW_TEST_DSN=postgres://...` (requires an isolated migrated PostgreSQL database; fails when the DSN is absent)
 
 ## Known limitations and production prerequisites
 
@@ -132,7 +133,7 @@ Required validation commands:
 - Authorization-version revocation and live membership revalidation remain future hardening work.
 - Invitation hashing currently derives from the configured application secret; production should use a separately managed, rotatable invitation-key ring.
 - Retention, deletion, legal-hold, and candidate export workflows are not part of this phase.
-- The PostgreSQL integration test requires an isolated migrated test database and is skipped when `INTERVIEW_TEST_DSN` is absent.
+- The PostgreSQL integration test requires an isolated migrated test database. The explicit `make test-integration` gate fails when `INTERVIEW_TEST_DSN` is absent; invoking `go test ./...` directly still skips that environment-gated test by design.
 
 ## Model-serving prerequisite and next phase
 

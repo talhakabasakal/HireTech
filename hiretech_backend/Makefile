@@ -1,4 +1,4 @@
-.PHONY: build run test lint migrate migrate-down docker-up docker-down clean help
+.PHONY: build run test test-integration lint migrate migrate-down docker-up docker-down clean help
 
 APP_NAME := masterfabric
 BUILD_DIR := bin
@@ -27,6 +27,11 @@ run:
 test:
 	@echo "Running tests..."
 	go test -v -race -count=1 ./...
+
+## test-integration: Run the PostgreSQL lifecycle integration test (requires an isolated DSN)
+test-integration:
+	@test -n "$(INTERVIEW_TEST_DSN)" || (echo "INTERVIEW_TEST_DSN is required; refusing to report a skipped integration test as success" >&2; exit 1)
+	INTERVIEW_TEST_DSN="$(INTERVIEW_TEST_DSN)" go test -count=1 ./internal/infrastructure/postgres/interview -run '^TestInterviewLifecyclePostgres$$'
 
 ## test-cover: Run tests with coverage
 test-cover:

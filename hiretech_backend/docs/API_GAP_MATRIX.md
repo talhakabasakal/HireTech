@@ -143,7 +143,7 @@ The mappings below show which existing use cases may be reused. They do not auth
 ## 9. Remaining implementation dependencies and critical path
 
 ```text
-Migrated PostgreSQL/Redis integration validation with managed JWT keys
+Migrated PostgreSQL/Redis integration validation with managed JWT keys (explicit `make test-integration` gate)
   -> audit relay alerting/retention and complete admin audit lifecycle
   -> real interviewer/evaluator model artifacts and quality/latency evidence
   -> subscription authorization and persisted-operation allowlist

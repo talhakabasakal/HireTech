@@ -2,7 +2,19 @@
 
 ## 1. Scope and status vocabulary
 
-This matrix compares the implemented Go backend with the proposed GraphQL frontend boundary. It is a planning artifact; target operations and modules are not implemented yet.
+This matrix compares the implemented Go backend with the proposed GraphQL
+frontend boundary. It remains a planning artifact: a row marked `Missing` or
+`Planned` describes a remaining target gap, not a request to bypass the
+current security or release gates. The implementation snapshot and evidence
+for the delivered GraphQL/domain work are maintained in
+[`GRAPHQL_IMPLEMENTATION_STATUS.md`](./GRAPHQL_IMPLEMENTATION_STATUS.md).
+
+The transport and core interview/evaluation/admin operations listed below are
+already implemented in the current backend. This matrix intentionally keeps
+the remaining production gaps visible, especially subscriptions, persisted
+operations, full compliance workflows, and real provider/sandbox validation.
+
+Snapshot: 2026-09-05.
 
 Status values:
 
@@ -15,17 +27,17 @@ Status values:
 
 | Capability | Current state | Target state | Status | Planned increment |
 | --- | --- | --- | --- | --- |
-| GraphQL HTTP endpoint | No route, schema, dependency, or resolver | `POST /graphql` in the existing Go process | Missing | 1 |
+| GraphQL HTTP endpoint | POST-only `/graphql` route, schema, generated transport, and resolvers | `POST /graphql` in the existing Go process | Implemented; protect with tests | 0 onward |
 | GraphQL subscriptions | Existing custom `/api/v1/ws` only | `/graphql/ws` using `graphql-transport-ws`, backed by the event bus | Missing | 3 |
 | REST compatibility | `/api/v1/**` routes are active | Remain unchanged while sharing use cases with GraphQL | Implemented; protect with tests | 0 onward |
 | Existing WebSocket compatibility | Organization/app domain-event stream exists | Remain available; do not overload it with candidate chat semantics | Implemented; protect with tests | 0 onward |
-| GraphQL schema lifecycle | None | Schema-first source, generated code, linting, registry, breaking-change gate | Missing | 0–1 |
-| GraphQL error contract | REST JSON errors only | Sanitized GraphQL errors with stable `extensions.code` and request ID | Missing | 1 |
+| GraphQL schema lifecycle | Source-controlled schema and generated gqlgen transport/model code | Schema-first source, generated code, linting, registry, breaking-change gate | Partial | 0–1 |
+| GraphQL error contract | Sanitized errors with stable codes and request ID | Sanitized GraphQL errors with stable `extensions.code` and request ID | Implemented; expand contract tests | 0 onward |
 | GraphQL pagination | REST page/per-page | Opaque cursor connections with bounded page size | Missing | 1 |
-| GraphQL request limits | Global body cap only | Body, operation, depth, node, alias, fragment, and complexity limits | Partial | 1 |
+| GraphQL request limits | Body, operation, depth, node, alias, fragment, complexity, introspection, and timeout limits | Same controls with regression coverage | Implemented; protect with tests | 0 onward |
 | Resolver batching | None | Request-scoped, tenant-keyed DataLoaders | Missing | 1 |
 | Persisted operations | None | Production frontend allowlist after schema stabilization | Missing | 5/hardening |
-| Frontend API client | Default Next.js starter | Generated typed GraphQL client behind a frontend adapter | Missing | After backend Increment 1 |
+| Frontend API client | Hand-written typed adapters and GraphQL documents behind a dependency-composed API mode | Generated typed GraphQL client behind a frontend adapter | Partial | After backend Increment 1 |
 
 ## 3. Authentication and tenant gaps
 
@@ -113,7 +125,7 @@ The mappings below show which existing use cases may be reused. They do not auth
 | Evaluation | `evaluation.report.created`, `evaluation.human_review.recorded` | Requested/completed, review recorded, report published/rejected |
 | LLM | None | Configuration drafted/validated/approved/activated/retired, invocation summary, route selected, fallback used, policy blocked |
 | Deletion | None | Requested, confirmed, sessions revoked, job started, store completed/failed, retention exception, completed/cancelled |
-| GraphQL access | None | Operation attempted/completed/denied with operation name, cost, duration, actor, tenant, and safe outcome |
+| GraphQL access | Partial: synchronous request audit projection records operation, actor, tenant, duration, and safe outcome | Add dedicated attempted/completed/denied events plus operation cost fields |
 
 ## 8. Security and compliance gaps by data class
 
@@ -126,24 +138,22 @@ The mappings below show which existing use cases may be reused. They do not auth
 | Evaluation data | Scores, rationale, confidence, review notes | None | Explainability, evidence links, review gate, bias monitoring, restricted access |
 | LLM payload | Prompt, context, output, usage | None | Data minimization, provider policy, residency, no-training contract, redaction, bounded retention |
 | Admin configuration | Prompts, models, rubrics, routing | None | Versioning, dual control, secret references, rollout/rollback, complete audit |
-| Audit data | Actor/action/resource/IP metadata | Table/repository exists; middleware unwired | Transactional writes, immutable policy, restricted reads, integrity and retention controls |
+| Audit data | Actor/action/resource/IP metadata; transactional outbox writes and bounded idempotent relay | Immutable policy, restricted reads, integrity and retention controls; add dedicated admin lifecycle events, retention, and integrity verification |
 
-## 9. Implementation dependencies and critical path
+## 9. Remaining implementation dependencies and critical path
 
 ```text
-Tenant/auth decisions and REST tests
-  -> GraphQL transport + trusted ActorContext
-  -> bootstrap/tenant tokens
-  -> OTP/sessions/devices
-  -> non-LLM interview lifecycle
-  -> evaluation + human review
-  -> model registry/prompts/rubrics/router
-  -> interviewer/evaluator adapters
-  -> deletion and retention verification
-  -> frontend production integration
+Migrated PostgreSQL/Redis integration validation with managed JWT keys
+  -> monitored audit relay and complete admin audit lifecycle
+  -> real interviewer/evaluator model artifacts and quality/latency evidence
+  -> subscription authorization and persisted-operation allowlist
+  -> separately reviewed code-execution sandbox
+  -> deletion, retention, export, and legal-hold verification
+  -> frontend E2E and authorized release packaging
 ```
 
-Code execution can proceed as a separately reviewed sandbox track after the interview aggregate exists. Fine-tuning is explicitly outside this plan.
+Code execution remains a separately reviewed sandbox track. Fine-tuning is
+explicitly outside this plan.
 
 ## 10. Highest-priority acceptance tests
 

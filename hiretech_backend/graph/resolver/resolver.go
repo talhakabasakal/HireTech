@@ -5,6 +5,7 @@ import (
 	evaluationUsecase "github.com/masterfabric-go/masterfabric/internal/application/evaluation/usecase"
 	iamUsecase "github.com/masterfabric-go/masterfabric/internal/application/iam/usecase"
 	interviewUsecase "github.com/masterfabric-go/masterfabric/internal/application/interview/usecase"
+	infraWS "github.com/masterfabric-go/masterfabric/internal/infrastructure/websocket"
 )
 
 // This file will not be regenerated automatically.
@@ -17,4 +18,5 @@ type Resolver struct {
 	EvaluationUseCase    *evaluationUsecase.EvaluationService
 	QuestionDraftUseCase *interviewUsecase.QuestionDraftService
 	AIAdminUseCase       *aiadminUsecase.Service
+	SubscriptionBroker   *infraWS.SubscriptionBroker
 }

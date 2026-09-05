@@ -12,10 +12,12 @@ import (
 
 	"github.com/google/uuid"
 	iamService "github.com/masterfabric-go/masterfabric/internal/domain/iam/service"
+	interviewEvent "github.com/masterfabric-go/masterfabric/internal/domain/interview/event"
 	interviewModel "github.com/masterfabric-go/masterfabric/internal/domain/interview/model"
 	interviewRepo "github.com/masterfabric-go/masterfabric/internal/domain/interview/repository"
 	"github.com/masterfabric-go/masterfabric/internal/shared/authcontext"
 	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
+	sharedEvents "github.com/masterfabric-go/masterfabric/internal/shared/events"
 	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
 )
 
@@ -71,14 +73,19 @@ type CandidateAccess struct {
 }
 
 type InterviewService struct {
-	repo   interviewRepo.InterviewRepository
-	auth   iamService.AuthService
-	secret string
-	now    func() time.Time
+	repo     interviewRepo.InterviewRepository
+	auth     iamService.AuthService
+	secret   string
+	eventBus sharedEvents.EventBus
+	now      func() time.Time
 }
 
-func NewInterviewService(repo interviewRepo.InterviewRepository, auth iamService.AuthService, secret string) *InterviewService {
-	return &InterviewService{repo: repo, auth: auth, secret: secret, now: func() time.Time { return time.Now().UTC() }}
+func NewInterviewService(repo interviewRepo.InterviewRepository, auth iamService.AuthService, secret string, buses ...sharedEvents.EventBus) *InterviewService {
+	var eventBus sharedEvents.EventBus
+	if len(buses) > 0 {
+		eventBus = buses[0]
+	}
+	return &InterviewService{repo: repo, auth: auth, secret: secret, eventBus: eventBus, now: func() time.Time { return time.Now().UTC() }}
 }
 
 func (s *InterviewService) Create(ctx context.Context, actor authcontext.ActorContext, input CreateInterviewInput) (*interviewModel.Interview, error) {
@@ -119,6 +126,7 @@ func (s *InterviewService) Create(ctx context.Context, actor authcontext.ActorCo
 	if err := s.repo.Create(ctx, interview, s.audit(actor, "interview.created", "interview", interview.ID, uuid.Nil, "", string(interview.Status))); err != nil {
 		return nil, err
 	}
+	s.publishChanged(ctx, actor, interview.ID, "interview.created", interview.Status, interview.Version)
 	return interview, nil
 }
 
@@ -241,6 +249,7 @@ func (s *InterviewService) AddQuestion(ctx context.Context, actor authcontext.Ac
 	if err := s.repo.AddQuestion(ctx, question, interview.Version, s.audit(actor, "interview.question.added", "question", question.ID, interview.ID, string(interview.Status), string(interviewModel.StatusReady))); err != nil {
 		return nil, err
 	}
+	s.publishChanged(ctx, actor, interview.ID, "interview.question.added", interview.Status, interview.Version)
 	return question, nil
 }
 
@@ -255,7 +264,11 @@ func (s *InterviewService) Publish(ctx context.Context, actor authcontext.ActorC
 	if !interview.CanPublish() {
 		return nil, domainErr.New(domainErr.ErrConflict, "interview is not ready to publish", nil)
 	}
-	return s.repo.Publish(ctx, actor.OrganizationID, id, interview.Version, s.now(), s.audit(actor, "interview.published", "interview", id, uuid.Nil, string(interview.Status), string(interviewModel.StatusInvited)))
+	updated, err := s.repo.Publish(ctx, actor.OrganizationID, id, interview.Version, s.now(), s.audit(actor, "interview.published", "interview", id, uuid.Nil, string(interview.Status), string(interviewModel.StatusInvited)))
+	if err == nil {
+		s.publishChanged(ctx, actor, id, "interview.published", updated.Status, updated.Version)
+	}
+	return updated, err
 }
 
 func (s *InterviewService) CreateInvitation(ctx context.Context, actor authcontext.ActorContext, interviewID uuid.UUID, expiresAt time.Time) (*InvitationSecret, error) {
@@ -283,6 +296,7 @@ func (s *InterviewService) CreateInvitation(ctx context.Context, actor authconte
 	if err := s.repo.CreateInvitation(ctx, invitation, interview.Version, s.audit(actor, "interview.invitation.created", "invitation", invitation.ID, interviewID, string(interview.Status), string(interviewModel.StatusInvited))); err != nil {
 		return nil, err
 	}
+	s.publishChanged(ctx, actor, interviewID, "interview.invitation.created", interview.Status, interview.Version)
 	return &InvitationSecret{Invitation: invitation, Token: token}, nil
 }
 
@@ -302,6 +316,7 @@ func (s *InterviewService) RedeemInvitation(ctx context.Context, actor authconte
 	if err != nil {
 		return nil, domainErr.New(domainErr.ErrInternal, "failed to issue candidate access token", err)
 	}
+	s.publishChanged(ctx, actor, interview.ID, "interview.invitation.redeemed", interview.Status, interview.Version)
 	return &CandidateAccess{AccessToken: token, Interview: interview}, nil
 }
 
@@ -317,7 +332,11 @@ func (s *InterviewService) Start(ctx context.Context, actor authcontext.ActorCon
 		return nil, domainErr.New(domainErr.ErrConflict, "interview has expired", nil)
 	}
 	session := &interviewModel.Session{ID: uuid.New(), OrganizationID: interview.OrganizationID, InterviewID: interview.ID, UserID: actor.UserID, DeviceID: actor.DeviceID, Status: interviewModel.SessionActive, LastSeenAt: s.now(), Version: 1, CreatedAt: s.now()}
-	return s.repo.Start(ctx, session, interview.Version, s.now(), s.audit(actor, "interview.started", "interview", interview.ID, uuid.Nil, string(interview.Status), string(interviewModel.StatusInProgress)))
+	updated, err := s.repo.Start(ctx, session, interview.Version, s.now(), s.audit(actor, "interview.started", "interview", interview.ID, uuid.Nil, string(interview.Status), string(interviewModel.StatusInProgress)))
+	if err == nil {
+		s.publishChanged(ctx, actor, interview.ID, "interview.started", updated.Status, updated.Version)
+	}
+	return updated, err
 }
 
 func (s *InterviewService) SubmitAnswer(ctx context.Context, actor authcontext.ActorContext, input SubmitAnswerInput) (*interviewModel.Answer, error) {
@@ -343,7 +362,11 @@ func (s *InterviewService) SubmitAnswer(ctx context.Context, actor authcontext.A
 	}
 	now := s.now()
 	answer := &interviewModel.Answer{ID: uuid.New(), OrganizationID: interview.OrganizationID, InterviewID: interview.ID, QuestionID: question.ID, UserID: actor.UserID, Status: interviewModel.AnswerSubmitted, Text: textValue, CodeLanguage: codeLanguage, CodeContent: codeContent, ContentHash: answerHash(textValue, codeLanguage, codeContent), IdempotencyKey: input.IdempotencyKey, SupersedesID: input.SupersedesID, SubmittedAt: now, CreatedAt: now}
-	return s.repo.SubmitAnswer(ctx, answer, s.audit(actor, "interview.answer.submitted", "answer", answer.ID, interview.ID, "", string(answer.Status)))
+	saved, err := s.repo.SubmitAnswer(ctx, answer, s.audit(actor, "interview.answer.submitted", "answer", answer.ID, interview.ID, "", string(answer.Status)))
+	if err == nil {
+		s.publishChanged(ctx, actor, interview.ID, "interview.answer.submitted", interview.Status, interview.Version)
+	}
+	return saved, err
 }
 
 func (s *InterviewService) Complete(ctx context.Context, actor authcontext.ActorContext, interviewID uuid.UUID) (*interviewModel.Interview, error) {
@@ -354,7 +377,11 @@ func (s *InterviewService) Complete(ctx context.Context, actor authcontext.Actor
 	if interview.Status != interviewModel.StatusInProgress {
 		return nil, domainErr.New(domainErr.ErrConflict, "interview cannot be completed", nil)
 	}
-	return s.repo.Complete(ctx, interview.OrganizationID, interview.ID, actor.UserID, interview.Version, s.now(), s.audit(actor, "interview.completed", "interview", interview.ID, uuid.Nil, string(interview.Status), string(interviewModel.StatusCompleted)))
+	updated, err := s.repo.Complete(ctx, interview.OrganizationID, interview.ID, actor.UserID, interview.Version, s.now(), s.audit(actor, "interview.completed", "interview", interview.ID, uuid.Nil, string(interview.Status), string(interviewModel.StatusCompleted)))
+	if err == nil {
+		s.publishChanged(ctx, actor, interview.ID, "interview.completed", updated.Status, updated.Version)
+	}
+	return updated, err
 }
 
 func (s *InterviewService) Cancel(ctx context.Context, actor authcontext.ActorContext, interviewID uuid.UUID) (*interviewModel.Interview, error) {
@@ -368,7 +395,23 @@ func (s *InterviewService) Cancel(ctx context.Context, actor authcontext.ActorCo
 	if interview.IsTerminal() {
 		return nil, domainErr.New(domainErr.ErrConflict, "interview cannot be cancelled", nil)
 	}
-	return s.repo.Cancel(ctx, actor.OrganizationID, interview.ID, interview.Version, s.now(), s.audit(actor, "interview.cancelled", "interview", interview.ID, uuid.Nil, string(interview.Status), string(interviewModel.StatusCancelled)))
+	updated, err := s.repo.Cancel(ctx, actor.OrganizationID, interview.ID, interview.Version, s.now(), s.audit(actor, "interview.cancelled", "interview", interview.ID, uuid.Nil, string(interview.Status), string(interviewModel.StatusCancelled)))
+	if err == nil {
+		s.publishChanged(ctx, actor, interview.ID, "interview.cancelled", updated.Status, updated.Version)
+	}
+	return updated, err
+}
+
+func (s *InterviewService) publishChanged(ctx context.Context, actor authcontext.ActorContext, interviewID uuid.UUID, eventType string, status interviewModel.Status, version int) {
+	if s.eventBus == nil || actor.OrganizationID == uuid.Nil || interviewID == uuid.Nil {
+		return
+	}
+	// Realtime delivery is advisory; the committed repository mutation remains
+	// authoritative and the event contains no protected interview content.
+	_ = s.eventBus.Publish(ctx, sharedEvents.TopicInterview, interviewEvent.Changed{
+		OrganizationID: actor.OrganizationID, InterviewID: interviewID, ActorID: actor.UserID,
+		EventType: eventType, Status: string(status), Version: version, Timestamp: s.now(),
+	})
 }
 
 func (s *InterviewService) GetQuestion(ctx context.Context, actor authcontext.ActorContext, questionID uuid.UUID) (*interviewModel.Question, error) {

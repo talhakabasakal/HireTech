@@ -58,12 +58,13 @@ type Dependencies struct {
 	SessionValidator iamService.SessionValidator
 
 	// Handlers
-	IAMHandler      *iamHandler.Handler
-	TenantHandler   *tenantHandler.Handler
-	APIMgmtHandler  *apimgmtHandler.Handler
-	AuditHandler    *auditHandler.Handler
-	RealtimeHandler *realtimeHandler.Handler
-	GraphQLHandler  http.Handler
+	IAMHandler              *iamHandler.Handler
+	TenantHandler           *tenantHandler.Handler
+	APIMgmtHandler          *apimgmtHandler.Handler
+	AuditHandler            *auditHandler.Handler
+	RealtimeHandler         *realtimeHandler.Handler
+	GraphQLHandler          http.Handler
+	GraphQLWebsocketHandler http.Handler
 
 	// Gateway
 	GatewayPipeline *gateway.Pipeline
@@ -93,6 +94,9 @@ func New(deps Dependencies) *chi.Mux {
 
 	if deps.GraphQLHandler != nil {
 		r.With(graphqlInfra.AuthMiddleware(deps.AuthService, deps.SessionValidator)).Post("/graphql", deps.GraphQLHandler.ServeHTTP)
+	}
+	if deps.GraphQLWebsocketHandler != nil {
+		r.Get("/graphql", deps.GraphQLWebsocketHandler.ServeHTTP)
 	}
 
 	// Health endpoints

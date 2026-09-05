@@ -30,6 +30,10 @@ Phase 4 and Phase 5 add:
 - `adminAuditEvents(first, after)` provides an independently bounded,
   tenant-scoped keyset connection for audit history; it requires `audit:read`,
   recent authentication/MFA, and a cursor-capable audit repository.
+- `interviewUpdated(interviewId)` provides a candidate-safe GraphQL
+  subscription over the existing event bus. It is served on the `/graphql`
+  WebSocket upgrade route using `graphql-transport-ws`, with explicit
+  organization/interview scope and bounded in-process subscription capacity.
 
 The schema remains source-controlled at `graph/schema.graphqls`; gqlgen transport code is generated under `graph/generated` and `graph/model`. Resolvers are thin adapters over application services.
 
@@ -66,6 +70,11 @@ compatibility. Invalid cursors and out-of-range page sizes fail with
   events. Wildcard permissions use the same matcher as REST RBAC.
 - Nested questions and answers have independent permission checks, preventing `interview:read` from implicitly exposing prompts, candidate text, or code.
 - Every root field in an operation is authorized, including fields reached through fragments. A permitted first root field cannot mask a forbidden second field.
+- WebSocket subscriptions authenticate from the `connection_init` Bearer
+  payload, reject tenant-selection headers, enforce tenant or exact signed
+  candidate-interview scope, and allow only lifecycle metadata in update
+  payloads. Configured origins are matched explicitly; an empty origin list
+  does not become an allow-all browser policy.
 - Stable GraphQL errors remain `UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_FAILED`, `CONFLICT`, `RATE_LIMITED`, `NOT_FOUND`, and `INTERNAL`.
 
 ## Persistence and audit
@@ -98,7 +107,13 @@ protected content.
 
 ## Security limits
 
-Existing GraphQL controls remain active: POST-only transport, GraphQL audience validation, server-side session/device validation, 1 MiB default request limit, 4,096 parser tokens, one operation, complexity 50, depth 8, nodes 64, no aliases, no batches, disabled introspection, five-second resolver timeout, sanitized errors, and synchronous request audit recording.
+Existing GraphQL controls remain active: POST-only HTTP transport, explicit
+WebSocket enablement for subscriptions, GraphQL audience validation,
+server-side session/device validation, 1 MiB default request limit, 4,096
+parser tokens, one operation, complexity 50, depth 8, nodes 64, no aliases,
+no batches, disabled introspection, five-second HTTP resolver timeout,
+sanitized errors, synchronous request audit recording, and a transport-level
+persisted-operation gate that also covers WebSocket messages when enabled.
 
 ## Tests and validation
 
@@ -123,11 +138,14 @@ Required validation commands:
   batch, projected-event, failure, and duration metrics through the existing
   OpenTelemetry/Prometheus pipeline. Retention, integrity verification, and a
   separately operated high-volume worker remain production hardening work.
-- GraphQL subscriptions remain deferred. Persisted-operation hash allowlisting
-  is implemented behind `GRAPHQL_REQUIRE_PERSISTED_OPERATIONS`; keep it
-  disabled until `GRAPHQL_ALLOWED_OPERATION_HASHES` contains the reviewed
-  frontend hash manifest. Production startup fails closed when the gate is
-  enabled without a valid manifest.
+- `interviewUpdated` is implemented for lifecycle notifications. A durable
+  reconnect cursor, cross-instance subscription fan-out, evaluation-specific
+  streams, and a separately operated high-volume subscription worker remain
+  future work. Persisted-operation hash allowlisting is implemented behind
+  `GRAPHQL_REQUIRE_PERSISTED_OPERATIONS`; keep it disabled until
+  `GRAPHQL_ALLOWED_OPERATION_HASHES` contains the reviewed frontend hash
+  manifest. Production startup fails closed when the gate is enabled without
+  a valid manifest.
 - Development/test may use HS256, but production startup now requires RS256 with a managed RSA private key, `kid`-indexed public keys, and explicit key configuration. Retain old public keys only for a bounded rotation overlap and remove them after token expiry.
 - Development startup tolerates unavailable PostgreSQL/Redis for local iteration; with `APP_ENV=production`, startup now fails closed when either required security dependency is unavailable.
 - Authorization-version revocation and live membership revalidation remain future hardening work.

@@ -15,6 +15,54 @@ Real-time event delivery for multi-tenant clients over a dedicated WebSocket end
 └─────────────┘     JSON push    └──────────────┘     Rooms        └─────────────┘
 ```
 
+GraphQL subscriptions are a separate, interview-scoped transport on the same
+`/graphql` route. They do not reuse the generic `/api/v1/ws` room protocol and
+must not be treated as a replacement for that compatibility endpoint.
+
+## GraphQL interview subscription
+
+The server accepts the `graphql-transport-ws` subprotocol only when
+`WS_ENABLED=true` and the subscription broker is initialized:
+
+```text
+GET /graphql
+```
+
+Authentication is sent in the `connection_init` payload:
+
+```json
+{
+  "type": "connection_init",
+  "payload": { "Authorization": "Bearer <graphql-audience-jwt>" }
+}
+```
+
+The subscription operation is:
+
+```graphql
+subscription InterviewUpdates($interviewId: UUID!) {
+  interviewUpdated(interviewId: $interviewId) {
+    interviewId
+    eventType
+    status
+    version
+    occurredAt
+  }
+}
+```
+
+Tenant tokens require `interview:read`. Candidate-interview tokens require the
+exact signed `interview_id` and `interview:participate`. The payload contains
+only lifecycle metadata; answer text, code, prompts, tokens, and provider
+payloads are never broadcast. Tenant-selection headers are rejected and the
+browser `Origin` must match `CORS_ALLOWED_ORIGINS` explicitly.
+
+The in-process broker caps active streams at `WS_MAX_CONNECTIONS` and uses a
+small bounded per-stream buffer. A full buffer drops the advisory update and
+logs the condition; the database lifecycle state remains authoritative. There
+is currently no durable replay cursor or cross-instance fan-out, so clients
+must refetch current state after reconnect.
+
 ## Design principles
 
 1. **Separate bounded context** — WebSocket is not part of the HTTP gateway pipeline. It lives in a `realtime` domain with its own hub and handler.

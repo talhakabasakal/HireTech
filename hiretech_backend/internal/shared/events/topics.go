@@ -15,6 +15,9 @@ const (
 
 	// Audit events (consumers write to audit log)
 	TopicAudit = "masterfabric.audit"
+
+	// Interview lifecycle and candidate-safe realtime updates.
+	TopicInterview = "masterfabric.interview"
 )
 
 // Event type constants used in Envelope.Type for routing / filtering.
@@ -34,4 +37,7 @@ const (
 	EventTypeEndpointCreated = "endpoint.created"
 	EventTypeEndpointUpdated = "endpoint.updated"
 	EventTypeEndpointRetired = "endpoint.retired"
+
+	// Interview
+	EventTypeInterviewChanged = "interview.changed"
 )

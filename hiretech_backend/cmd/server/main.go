@@ -287,7 +287,7 @@ func buildDependencies(
 	registerUC := iamUC.NewRegisterUseCase(userRepo, jwtService, eventBus)
 	loginUC := iamUC.NewLoginUseCase(userRepo, jwtService, iamUC.RepositoryAuditRecorder{Repo: auditRepo})
 	organizationContextUC := iamUC.NewOrganizationContextUseCase(userRepo, orgRepo, orgUserRepo, jwtService, rbacService)
-	interviewService := interviewUC.NewInterviewService(interviewRepo, jwtService, cfg.JWT.Secret)
+	interviewService := interviewUC.NewInterviewService(interviewRepo, jwtService, cfg.JWT.Secret, eventBus)
 	var interviewerGateway aiService.Gateway
 	var evaluatorGateway aiService.Gateway
 	if cfg.AI.Enabled {
@@ -362,7 +362,10 @@ func buildDependencies(
 	)
 	deps.APIMgmtHandler = apimgmtHandler.NewHandler(defineEndpointUC, updatePolicyUC, retireEndpointUC, activateEndpointUC, endpointRepo, policyRepo)
 	deps.AuditHandler = auditHandler.NewHandler(auditRepo)
-	deps.GraphQLHandler = graphqlInfra.NewHandler(graphqlInfra.Dependencies{
+	subscriptionBroker := infraWS.NewSubscriptionBroker(log, cfg.WebSocket.MaxConnections)
+	subscriptionBroker.Register(eventBus)
+	defer subscriptionBroker.Close()
+	graphqlHandler := graphqlInfra.NewHandler(graphqlInfra.Dependencies{
 		AuthService:                jwtService,
 		SessionValidator:           securityUC,
 		UseCase:                    organizationContextUC,
@@ -374,7 +377,12 @@ func buildDependencies(
 		MaxBodyBytes:               cfg.Server.MaxBodyBytes,
 		RequirePersistedOperations: cfg.GraphQL.RequirePersistedOperations,
 		AllowedOperationHashes:     cfg.GraphQL.AllowedOperationHashes,
+		SubscriptionBroker:         subscriptionBroker,
+		WebSocketEnabled:           cfg.WebSocket.Enabled,
+		WebSocketAllowedOrigins:    cfg.Server.CORSAllowedOrigins,
 	})
+	deps.GraphQLHandler = graphqlHandler
+	deps.GraphQLWebsocketHandler = http.HandlerFunc(graphqlHandler.WebsocketHandler)
 
 	// --- WebSocket real-time hub ---
 	wsHub := infraWS.NewHub(log, cfg.WebSocket.MaxConnections)

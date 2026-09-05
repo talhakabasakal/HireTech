@@ -17,6 +17,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/google/uuid"
+	gorillaws "github.com/gorilla/websocket"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 
 	"github.com/masterfabric-go/masterfabric/graph/generated"
@@ -26,6 +27,7 @@ import (
 	iamUsecase "github.com/masterfabric-go/masterfabric/internal/application/iam/usecase"
 	interviewUsecase "github.com/masterfabric-go/masterfabric/internal/application/interview/usecase"
 	"github.com/masterfabric-go/masterfabric/internal/domain/iam/service"
+	infraWS "github.com/masterfabric-go/masterfabric/internal/infrastructure/websocket"
 	"github.com/masterfabric-go/masterfabric/internal/shared/authcontext"
 	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
 	"github.com/masterfabric-go/masterfabric/internal/shared/logger"
@@ -42,9 +44,14 @@ const (
 	MaxOperations   = 1
 )
 
-// Handler is the POST-only GraphQL transport with request-scoped limits.
+// Handler is the GraphQL transport with request-scoped limits. HTTP queries
+// remain POST-only; subscriptions use the separately routed WebSocket method.
 type Handler struct {
 	server                     *handler.Server
+	auth                       service.AuthService
+	sessionValidator           service.SessionValidator
+	subscriptionBroker         *infraWS.SubscriptionBroker
+	websocketEnabled           bool
 	timeout                    time.Duration
 	maxBodyBytes               int64
 	requirePersistedOperations bool
@@ -63,14 +70,33 @@ type Dependencies struct {
 	MaxBodyBytes               int64
 	RequirePersistedOperations bool
 	AllowedOperationHashes     []string
+	SubscriptionBroker         *infraWS.SubscriptionBroker
+	WebSocketEnabled           bool
+	WebSocketAllowedOrigins    []string
 }
 
 func NewHandler(deps Dependencies) *Handler {
+	h := &Handler{
+		auth: deps.AuthService, sessionValidator: deps.SessionValidator,
+		subscriptionBroker: deps.SubscriptionBroker, websocketEnabled: deps.WebSocketEnabled,
+	}
 	server := handler.New(generated.NewExecutableSchema(generated.Config{
-		Resolvers: &resolver.Resolver{UseCase: deps.UseCase, InterviewUseCase: deps.InterviewUseCase, EvaluationUseCase: deps.EvaluationUseCase, QuestionDraftUseCase: deps.QuestionDraftUseCase, AIAdminUseCase: deps.AIAdminUseCase},
+		Resolvers: &resolver.Resolver{UseCase: deps.UseCase, InterviewUseCase: deps.InterviewUseCase, EvaluationUseCase: deps.EvaluationUseCase, QuestionDraftUseCase: deps.QuestionDraftUseCase, AIAdminUseCase: deps.AIAdminUseCase, SubscriptionBroker: deps.SubscriptionBroker},
 	}))
-	// POST is the only application transport in this phase. In particular, no
-	// GET query transport or batched-operation transport is enabled.
+	// POST is the only HTTP application transport. WebSocket is added only when
+	// the explicitly configured subscription capability is enabled.
+	if deps.SubscriptionBroker != nil && deps.WebSocketEnabled {
+		server.AddTransport(transport.Websocket{
+			Upgrader: gorillaws.Upgrader{
+				ReadBufferSize:  1024,
+				WriteBufferSize: 1024,
+				CheckOrigin:     websocketOriginAllowed(deps.WebSocketAllowedOrigins),
+			},
+			InitTimeout:           5 * time.Second,
+			KeepAlivePingInterval: 30 * time.Second,
+			InitFunc:              h.websocketInit,
+		})
+	}
 	server.AddTransport(transport.POST{})
 	server.SetParserTokenLimit(MaxParserTokens)
 	server.Use(extension.FixedComplexityLimit(MaxComplexity))
@@ -96,12 +122,86 @@ func NewHandler(deps Dependencies) *Handler {
 			allowedHashes[hash] = struct{}{}
 		}
 	}
-	return &Handler{
-		server:                     server,
-		timeout:                    timeout,
-		maxBodyBytes:               deps.MaxBodyBytes,
-		requirePersistedOperations: deps.RequirePersistedOperations,
-		allowedOperationHashes:     allowedHashes,
+	if deps.RequirePersistedOperations {
+		server.Use(persistedOperationGate{allowedHashes: allowedHashes})
+	}
+	h.server = server
+	h.timeout = timeout
+	h.maxBodyBytes = deps.MaxBodyBytes
+	h.requirePersistedOperations = deps.RequirePersistedOperations
+	h.allowedOperationHashes = allowedHashes
+	return h
+}
+
+// WebsocketHandler is intentionally separate from ServeHTTP so the POST body
+// validator cannot be bypassed or accidentally invoked for a WebSocket
+// handshake. Authentication is performed from the connection_init payload.
+func (h *Handler) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
+	if h == nil || !h.websocketEnabled || h.subscriptionBroker == nil {
+		writeError(w, http.StatusServiceUnavailable, "INTERNAL", "GraphQL subscriptions are disabled")
+		return
+	}
+	for _, name := range []string{"X-Organization-ID", "X-Workspace-ID", "X-App-ID"} {
+		if r.Header.Get(name) != "" {
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "tenant headers are not accepted by GraphQL")
+			return
+		}
+	}
+	h.server.ServeHTTP(w, r)
+}
+
+func (h *Handler) websocketInit(ctx context.Context, payload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
+	authorization := payload.Authorization()
+	parts := strings.SplitN(authorization, " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") || strings.TrimSpace(parts[1]) == "" {
+		return nil, nil, errors.New("authentication required")
+	}
+	if h.auth == nil {
+		return nil, nil, errors.New("authentication required")
+	}
+	claims, err := h.auth.ValidateToken(ctx, strings.TrimSpace(parts[1]))
+	if err != nil || claims == nil || claims.UserID == uuid.Nil || claims.Audience != "hiretech-graphql" {
+		return nil, nil, errors.New("authentication required")
+	}
+	if h.sessionValidator != nil {
+		if err := h.sessionValidator.ValidateAccess(ctx, claims); err != nil {
+			return nil, nil, errors.New("authentication required")
+		}
+	}
+	tokenClass := authcontext.TokenClass(claims.TokenClass)
+	if tokenClass == "" {
+		tokenClass = authcontext.TokenClassBootstrap
+	}
+	if tokenClass != authcontext.TokenClassBootstrap && tokenClass != authcontext.TokenClassTenant && tokenClass != authcontext.TokenClassCandidateInterview {
+		return nil, nil, errors.New("authentication required")
+	}
+	actor := authcontext.ActorContext{
+		UserID: claims.UserID, Email: claims.Email, SessionID: claims.SessionID,
+		TokenClass: tokenClass, OrganizationID: claims.OrganizationID,
+		MembershipID: claims.MembershipID, DeviceID: claims.DeviceID, InterviewID: claims.InterviewID,
+		Permissions: claims.Permissions, AuthenticationMethods: claims.AuthenticationMethods,
+		AuthenticationTime: claims.AuthenticationTime,
+	}
+	ctx = authcontext.WithActor(ctx, actor)
+	if actor.OrganizationID != uuid.Nil {
+		ctx = logger.ContextWithOrganizationID(ctx, actor.OrganizationID.String())
+	}
+	ctx = logger.ContextWithUserID(ctx, actor.UserID.String())
+	return ctx, nil, nil
+}
+
+func websocketOriginAllowed(allowed []string) func(*http.Request) bool {
+	return func(r *http.Request) bool {
+		origin := strings.TrimSpace(r.Header.Get("Origin"))
+		if origin == "" {
+			return true
+		}
+		for _, candidate := range allowed {
+			if candidate == "*" || strings.EqualFold(strings.TrimSpace(candidate), origin) {
+				return true
+			}
+		}
+		return false
 	}
 }
 

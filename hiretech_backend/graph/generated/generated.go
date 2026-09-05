@@ -43,6 +43,7 @@ type ResolverRoot interface {
 	Interview() InterviewResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
+	Subscription() SubscriptionResolver
 }
 
 type DirectiveRoot struct {
@@ -242,6 +243,14 @@ type ComplexityRoot struct {
 		Token        func(childComplexity int) int
 	}
 
+	InterviewUpdated struct {
+		EventType   func(childComplexity int) int
+		InterviewID func(childComplexity int) int
+		OccurredAt  func(childComplexity int) int
+		Status      func(childComplexity int) int
+		Version     func(childComplexity int) int
+	}
+
 	Mutation struct {
 		AddQuestion                func(childComplexity int, input model.CreateQuestionInput) int
 		ApproveAdminConfiguration  func(childComplexity int, resource string, resourceKey string, version int) int
@@ -336,6 +345,10 @@ type ComplexityRoot struct {
 		TokenClass   func(childComplexity int) int
 	}
 
+	Subscription struct {
+		InterviewUpdated func(childComplexity int, interviewID uuid.UUID) int
+	}
+
 	User struct {
 		CreatedAt func(childComplexity int) int
 		Email     func(childComplexity int) int
@@ -386,6 +399,9 @@ type QueryResolver interface {
 	EvaluationReport(ctx context.Context, interviewID uuid.UUID) (*model.EvaluationReport, error)
 	AdminWorkspace(ctx context.Context) (*model.AdminWorkspace, error)
 	AdminAuditEvents(ctx context.Context, first *int, after *string) (*model.AdminAuditConnection, error)
+}
+type SubscriptionResolver interface {
+	InterviewUpdated(ctx context.Context, interviewID uuid.UUID) (<-chan *model.InterviewUpdated, error)
 }
 
 type executableSchema struct {
@@ -1242,6 +1258,37 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.InterviewInvitationPayload.Token(childComplexity), true
 
+	case "InterviewUpdated.eventType":
+		if e.complexity.InterviewUpdated.EventType == nil {
+			break
+		}
+
+		return e.complexity.InterviewUpdated.EventType(childComplexity), true
+	case "InterviewUpdated.interviewId":
+		if e.complexity.InterviewUpdated.InterviewID == nil {
+			break
+		}
+
+		return e.complexity.InterviewUpdated.InterviewID(childComplexity), true
+	case "InterviewUpdated.occurredAt":
+		if e.complexity.InterviewUpdated.OccurredAt == nil {
+			break
+		}
+
+		return e.complexity.InterviewUpdated.OccurredAt(childComplexity), true
+	case "InterviewUpdated.status":
+		if e.complexity.InterviewUpdated.Status == nil {
+			break
+		}
+
+		return e.complexity.InterviewUpdated.Status(childComplexity), true
+	case "InterviewUpdated.version":
+		if e.complexity.InterviewUpdated.Version == nil {
+			break
+		}
+
+		return e.complexity.InterviewUpdated.Version(childComplexity), true
+
 	case "Mutation.addQuestion":
 		if e.complexity.Mutation.AddQuestion == nil {
 			break
@@ -1815,6 +1862,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.SelectOrganizationPayload.TokenClass(childComplexity), true
 
+	case "Subscription.interviewUpdated":
+		if e.complexity.Subscription.InterviewUpdated == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_interviewUpdated_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Subscription.InterviewUpdated(childComplexity, args["interviewId"].(uuid.UUID)), true
+
 	case "User.createdAt":
 		if e.complexity.User.CreatedAt == nil {
 			break
@@ -1921,6 +1980,23 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
 			data := ec._Mutation(ctx, opCtx.Operation.SelectionSet)
 			var buf bytes.Buffer
+			data.MarshalGQL(&buf)
+
+			return &graphql.Response{
+				Data: buf.Bytes(),
+			}
+		}
+	case ast.Subscription:
+		next := ec._Subscription(ctx, opCtx.Operation.SelectionSet)
+
+		var buf bytes.Buffer
+		return func(ctx context.Context) *graphql.Response {
+			buf.Reset()
+			data := next(ctx)
+
+			if data == nil {
+				return nil
+			}
 			data.MarshalGQL(&buf)
 
 			return &graphql.Response{
@@ -2276,6 +2352,14 @@ type InterviewConnection {
   pageInfo: PageInfo!
 }
 
+type InterviewUpdated {
+  interviewId: UUID!
+  eventType: String!
+  status: String!
+  version: Int!
+  occurredAt: DateTime!
+}
+
 type Question {
   id: UUID!
   interviewId: UUID!
@@ -2473,6 +2557,10 @@ type Mutation {
   publishAdminRubric(input: PublishAdminRubricInput!): AdminEvaluationRubric!
   approveAdminConfiguration(resource: String!, resourceKey: String!, version: Int!): AdminConfigurationVersion!
   rollbackAdminConfiguration(resource: String!, resourceKey: String!, version: Int!): AdminConfigurationVersion!
+}
+
+type Subscription {
+  interviewUpdated(interviewId: UUID!): InterviewUpdated!
 }
 `, BuiltIn: false},
 }
@@ -2854,6 +2942,17 @@ func (ec *executionContext) field_Query_question_args(ctx context.Context, rawAr
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Subscription_interviewUpdated_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "interviewId", ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["interviewId"] = arg0
 	return args, nil
 }
 
@@ -7179,6 +7278,151 @@ func (ec *executionContext) fieldContext_InterviewInvitationPayload_expiresAt(_ 
 	return fc, nil
 }
 
+func (ec *executionContext) _InterviewUpdated_interviewId(ctx context.Context, field graphql.CollectedField, obj *model.InterviewUpdated) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_InterviewUpdated_interviewId,
+		func(ctx context.Context) (any, error) {
+			return obj.InterviewID, nil
+		},
+		nil,
+		ec.marshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_InterviewUpdated_interviewId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterviewUpdated",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type UUID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _InterviewUpdated_eventType(ctx context.Context, field graphql.CollectedField, obj *model.InterviewUpdated) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_InterviewUpdated_eventType,
+		func(ctx context.Context) (any, error) {
+			return obj.EventType, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_InterviewUpdated_eventType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterviewUpdated",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _InterviewUpdated_status(ctx context.Context, field graphql.CollectedField, obj *model.InterviewUpdated) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_InterviewUpdated_status,
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_InterviewUpdated_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterviewUpdated",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _InterviewUpdated_version(ctx context.Context, field graphql.CollectedField, obj *model.InterviewUpdated) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_InterviewUpdated_version,
+		func(ctx context.Context) (any, error) {
+			return obj.Version, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_InterviewUpdated_version(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterviewUpdated",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _InterviewUpdated_occurredAt(ctx context.Context, field graphql.CollectedField, obj *model.InterviewUpdated) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_InterviewUpdated_occurredAt,
+		func(ctx context.Context) (any, error) {
+			return obj.OccurredAt, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_InterviewUpdated_occurredAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterviewUpdated",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_selectOrganization(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10543,6 +10787,59 @@ func (ec *executionContext) fieldContext_SelectOrganizationPayload_membership(_ 
 			}
 			return nil, fmt.Errorf("no field named %q was found under type OrganizationMembership", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_interviewUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_interviewUpdated,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Subscription().InterviewUpdated(ctx, fc.Args["interviewId"].(uuid.UUID))
+		},
+		nil,
+		ec.marshalNInterviewUpdated2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewUpdated,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_interviewUpdated(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "interviewId":
+				return ec.fieldContext_InterviewUpdated_interviewId(ctx, field)
+			case "eventType":
+				return ec.fieldContext_InterviewUpdated_eventType(ctx, field)
+			case "status":
+				return ec.fieldContext_InterviewUpdated_status(ctx, field)
+			case "version":
+				return ec.fieldContext_InterviewUpdated_version(ctx, field)
+			case "occurredAt":
+				return ec.fieldContext_InterviewUpdated_occurredAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type InterviewUpdated", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_interviewUpdated_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -14197,6 +14494,65 @@ func (ec *executionContext) _InterviewInvitationPayload(ctx context.Context, sel
 	return out
 }
 
+var interviewUpdatedImplementors = []string{"InterviewUpdated"}
+
+func (ec *executionContext) _InterviewUpdated(ctx context.Context, sel ast.SelectionSet, obj *model.InterviewUpdated) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, interviewUpdatedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InterviewUpdated")
+		case "interviewId":
+			out.Values[i] = ec._InterviewUpdated_interviewId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "eventType":
+			out.Values[i] = ec._InterviewUpdated_eventType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._InterviewUpdated_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "version":
+			out.Values[i] = ec._InterviewUpdated_version(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "occurredAt":
+			out.Values[i] = ec._InterviewUpdated_occurredAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -15040,6 +15396,26 @@ func (ec *executionContext) _SelectOrganizationPayload(ctx context.Context, sel 
 	}
 
 	return out
+}
+
+var subscriptionImplementors = []string{"Subscription"}
+
+func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, subscriptionImplementors)
+	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+		Object: "Subscription",
+	})
+	if len(fields) != 1 {
+		ec.Errorf(ctx, "must subscribe to exactly one stream")
+		return nil
+	}
+
+	switch fields[0].Name {
+	case "interviewUpdated":
+		return ec._Subscription_interviewUpdated(ctx, fields[0])
+	default:
+		panic("unknown field " + strconv.Quote(fields[0].Name))
+	}
 }
 
 var userImplementors = []string{"User"}
@@ -16433,6 +16809,20 @@ func (ec *executionContext) unmarshalNInterviewStatus2githubᚗcomᚋmasterfabri
 
 func (ec *executionContext) marshalNInterviewStatus2githubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewStatus(ctx context.Context, sel ast.SelectionSet, v model.InterviewStatus) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) marshalNInterviewUpdated2githubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewUpdated(ctx context.Context, sel ast.SelectionSet, v model.InterviewUpdated) graphql.Marshaler {
+	return ec._InterviewUpdated(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNInterviewUpdated2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewUpdated(ctx context.Context, sel ast.SelectionSet, v *model.InterviewUpdated) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._InterviewUpdated(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNMembershipStatus2githubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐMembershipStatus(ctx context.Context, v any) (model.MembershipStatus, error) {

@@ -246,6 +246,14 @@ type InterviewInvitationPayload struct {
 	ExpiresAt    time.Time `json:"expiresAt"`
 }
 
+type InterviewUpdated struct {
+	InterviewID uuid.UUID `json:"interviewId"`
+	EventType   string    `json:"eventType"`
+	Status      string    `json:"status"`
+	Version     int       `json:"version"`
+	OccurredAt  time.Time `json:"occurredAt"`
+}
+
 type Mutation struct {
 }
 
@@ -351,6 +359,9 @@ type SubmitAnswerInput struct {
 	CodeContent    *string    `json:"codeContent,omitempty"`
 	IdempotencyKey uuid.UUID  `json:"idempotencyKey"`
 	SupersedesID   *uuid.UUID `json:"supersedesId,omitempty"`
+}
+
+type Subscription struct {
 }
 
 type UpdateAdminRoutingInput struct {

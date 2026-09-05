@@ -15,8 +15,10 @@ import (
 	interviewUsecase "github.com/masterfabric-go/masterfabric/internal/application/interview/usecase"
 	aiadminModel "github.com/masterfabric-go/masterfabric/internal/domain/aiadmin/model"
 	interviewModel "github.com/masterfabric-go/masterfabric/internal/domain/interview/model"
+	"github.com/masterfabric-go/masterfabric/internal/shared/authcontext"
 	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
 	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
+	"github.com/masterfabric-go/masterfabric/internal/shared/permissions"
 )
 
 // Questions is the resolver for the questions field.
@@ -577,6 +579,53 @@ func (r *queryResolver) AdminAuditEvents(ctx context.Context, first *int, after 
 	return &model.AdminAuditConnection{Edges: edges, PageInfo: &model.PageInfo{HasNextPage: page.HasNextPage, EndCursor: endCursor}}, nil
 }
 
+// InterviewUpdated is the resolver for the interviewUpdated field.
+func (r *subscriptionResolver) InterviewUpdated(ctx context.Context, interviewID uuid.UUID) (<-chan *model.InterviewUpdated, error) {
+	actor, err := requireActor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if interviewID == uuid.Nil || actor.OrganizationID == uuid.Nil {
+		return nil, domainErr.New(domainErr.ErrValidation, "interview subscription scope is required", nil)
+	}
+	switch actor.TokenClass {
+	case authcontext.TokenClassCandidateInterview:
+		if actor.InterviewID != interviewID || !hasPermission(actor.Permissions, "interview:participate") {
+			return nil, domainErr.New(domainErr.ErrForbidden, "interview subscription access denied", nil)
+		}
+	case authcontext.TokenClassTenant:
+		if !hasPermission(actor.Permissions, "interview:read") {
+			return nil, domainErr.New(domainErr.ErrForbidden, "interview subscription access denied", nil)
+		}
+	default:
+		return nil, domainErr.New(domainErr.ErrForbidden, "interview subscription access denied", nil)
+	}
+	if r.SubscriptionBroker == nil {
+		return nil, notConfigured("interview subscriptions")
+	}
+	updates, err := r.SubscriptionBroker.Subscribe(ctx, actor.OrganizationID, interviewID)
+	if err != nil {
+		return nil, domainErr.New(domainErr.ErrRateLimited, "interview subscription unavailable", err)
+	}
+	stream := make(chan *model.InterviewUpdated, 16)
+	go func() {
+		defer close(stream)
+		for update := range updates {
+			stream <- &model.InterviewUpdated{InterviewID: update.InterviewID, EventType: update.EventType, Status: update.Status, Version: update.Version, OccurredAt: update.OccurredAt}
+		}
+	}()
+	return stream, nil
+}
+
+func hasPermission(granted []string, required string) bool {
+	for _, value := range granted {
+		if permissions.Matches(value, required) {
+			return true
+		}
+	}
+	return false
+}
+
 // Interview returns generated.InterviewResolver implementation.
 func (r *Resolver) Interview() generated.InterviewResolver { return &interviewResolver{r} }
 
@@ -586,6 +635,10 @@ func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResol
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
+// Subscription returns generated.SubscriptionResolver implementation.
+func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subscriptionResolver{r} }
+
 type interviewResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type subscriptionResolver struct{ *Resolver }

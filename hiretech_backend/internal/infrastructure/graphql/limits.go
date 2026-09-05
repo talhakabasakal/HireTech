@@ -2,6 +2,11 @@ package graphql
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"strings"
 
 	"github.com/99designs/gqlgen/graphql"
 
@@ -14,6 +19,65 @@ import (
 )
 
 type operationLimits struct{}
+
+type persistedOperationGate struct {
+	allowedHashes map[string]struct{}
+}
+
+func (persistedOperationGate) ExtensionName() string { return "PersistedOperationGate" }
+
+func (persistedOperationGate) Validate(graphql.ExecutableSchema) error { return nil }
+
+// MutateOperationParameters runs for every transport, including WebSocket
+// subscriptions. The HTTP wrapper performs the same check before handing the
+// request to gqlgen; keeping this transport-level gate prevents that check
+// from being bypassed by connection_init/start messages.
+func (g persistedOperationGate) MutateOperationParameters(_ context.Context, params *graphql.RawParams) *gqlerror.Error {
+	if err := validatePersistedOperationParams(params.Query, params.Extensions, g.allowedHashes); err != nil {
+		return &gqlerror.Error{Message: err.Error(), Extensions: map[string]any{"code": "VALIDATION_FAILED"}}
+	}
+	return nil
+}
+
+func validatePersistedOperationParams(query string, extensions map[string]any, allowedHashes map[string]struct{}) error {
+	if strings.TrimSpace(query) == "" {
+		return errors.New("a persisted GraphQL operation is required")
+	}
+	persisted, ok := extensions["persistedQuery"].(map[string]any)
+	if !ok {
+		return errors.New("a valid persisted GraphQL operation hash is required")
+	}
+	versionOK := false
+	switch version := persisted["version"].(type) {
+	case float64:
+		versionOK = int(version) == 1
+	case int:
+		versionOK = version == 1
+	case int64:
+		versionOK = version == 1
+	case json.Number:
+		versionOK = version == "1"
+	}
+	if !versionOK {
+		return errors.New("a valid persisted GraphQL operation hash is required")
+	}
+	hash, ok := persisted["sha256Hash"].(string)
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if !ok || len(hash) != sha256.Size*2 {
+		return errors.New("a valid persisted GraphQL operation hash is required")
+	}
+	if _, err := hex.DecodeString(hash); err != nil {
+		return errors.New("a valid persisted GraphQL operation hash is required")
+	}
+	digest := sha256.Sum256([]byte(query))
+	if hash != hex.EncodeToString(digest[:]) {
+		return errors.New("persisted GraphQL operation hash does not match the query")
+	}
+	if _, ok := allowedHashes[hash]; !ok {
+		return errors.New("persisted GraphQL operation is not allowlisted")
+	}
+	return nil
+}
 
 func (operationLimits) ExtensionName() string { return "RequestLimits" }
 
@@ -186,16 +250,18 @@ func rootFieldAllowed(actor authcontext.ActorContext, field string) bool {
 		return actor.TokenClass == "" || actor.IsBootstrap() || actor.TokenClass == authcontext.TokenClassTenant
 	case "selectOrganization", "redeemInterviewInvitation":
 		return actor.IsBootstrap()
-	case "interviews", "createInterview", "addQuestion", "publishInterview", "createInterviewInvitation", "cancelInterview":
+	case "interviews", "interviewConnection", "createInterview", "addQuestion", "publishInterview", "createInterviewInvitation", "cancelInterview":
 		return actor.TokenClass == authcontext.TokenClassTenant
 	case "interview", "question", "answer":
 		return actor.TokenClass == authcontext.TokenClassTenant || actor.TokenClass == authcontext.TokenClassCandidateInterview
 	case "evaluationReport", "requestEvaluation", "recordHumanReview", "questionDraft", "requestQuestionDraft", "approveQuestionDraft", "rejectQuestionDraft":
 		return actor.TokenClass == authcontext.TokenClassTenant
-	case "adminWorkspace", "registerAdminModel", "createAdminPromptVersion", "updateAdminRouting", "publishAdminRubric":
+	case "adminWorkspace", "adminAuditEvents", "registerAdminModel", "createAdminPromptVersion", "updateAdminRouting", "publishAdminRubric":
 		return actor.TokenClass == authcontext.TokenClassTenant
 	case "startInterview", "submitAnswer", "completeInterview":
 		return actor.TokenClass == authcontext.TokenClassCandidateInterview
+	case "interviewUpdated":
+		return actor.TokenClass == authcontext.TokenClassTenant || actor.TokenClass == authcontext.TokenClassCandidateInterview
 	default:
 		return false
 	}

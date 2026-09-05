@@ -299,6 +299,14 @@ type InterviewConnection {
   pageInfo: PageInfo!
 }
 
+type InterviewUpdated {
+  interviewId: UUID!
+  eventType: String!
+  status: String!
+  version: Int!
+  occurredAt: DateTime!
+}
+
 type Question {
   id: UUID!
   interviewId: UUID!
@@ -496,4 +504,8 @@ type Mutation {
   publishAdminRubric(input: PublishAdminRubricInput!): AdminEvaluationRubric!
   approveAdminConfiguration(resource: String!, resourceKey: String!, version: Int!): AdminConfigurationVersion!
   rollbackAdminConfiguration(resource: String!, resourceKey: String!, version: Int!): AdminConfigurationVersion!
+}
+
+type Subscription {
+  interviewUpdated(interviewId: UUID!): InterviewUpdated!
 }

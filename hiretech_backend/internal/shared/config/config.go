@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -41,11 +42,20 @@ func (c *Config) ValidateForProduction() error {
 	if !c.IsProduction() {
 		return nil
 	}
-	if c.JWT.Secret == defaultJWTSecret {
-		return fmt.Errorf("JWT_SECRET must be explicitly configured in production")
+	if !strings.EqualFold(strings.TrimSpace(c.JWT.Algorithm), "RS256") {
+		if c.JWT.Secret == defaultJWTSecret {
+			return fmt.Errorf("JWT_SECRET must be explicitly configured in production")
+		}
+		if len(strings.TrimSpace(c.JWT.Secret)) < 32 {
+			return fmt.Errorf("JWT_SECRET must contain at least 32 characters in production")
+		}
+		return fmt.Errorf("JWT_ALGORITHM must be RS256 in production")
 	}
-	if len(strings.TrimSpace(c.JWT.Secret)) < 32 {
-		return fmt.Errorf("JWT_SECRET must contain at least 32 characters in production")
+	if strings.TrimSpace(c.JWT.PrivateKeyPEM) == "" {
+		return fmt.Errorf("JWT_PRIVATE_KEY_PEM must be configured in production")
+	}
+	if len(c.JWT.PublicKeys) == 0 || strings.TrimSpace(c.JWT.PublicKeys[c.JWT.ActiveKeyID]) == "" {
+		return fmt.Errorf("JWT_PUBLIC_KEYS must contain the active key id in production")
 	}
 	return nil
 }
@@ -123,6 +133,9 @@ func (r RedisConfig) Addr() string {
 type JWTConfig struct {
 	Secret             string
 	Keys               map[string]string
+	Algorithm          string
+	PrivateKeyPEM      string
+	PublicKeys         map[string]string
 	ActiveKeyID        string
 	ExpirationHours    int
 	AccessTokenMinutes int
@@ -206,6 +219,9 @@ func Load() *Config {
 		JWT: JWTConfig{
 			Secret:             envOrDefault("JWT_SECRET", defaultJWTSecret),
 			Keys:               parseKeyRing(os.Getenv("JWT_KEYS")),
+			Algorithm:          envOrDefault("JWT_ALGORITHM", "HS256"),
+			PrivateKeyPEM:      os.Getenv("JWT_PRIVATE_KEY_PEM"),
+			PublicKeys:         parsePublicKeyRing(os.Getenv("JWT_PUBLIC_KEYS")),
 			ActiveKeyID:        envOrDefault("JWT_ACTIVE_KID", "legacy"),
 			ExpirationHours:    envOrDefaultInt("JWT_EXPIRATION_HOURS", 24),
 			AccessTokenMinutes: envOrDefaultInt("JWT_ACCESS_TOKEN_MINUTES", 15),
@@ -281,6 +297,17 @@ func parseKeyRing(raw string) map[string]string {
 		if len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && strings.TrimSpace(parts[1]) != "" {
 			result[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
 		}
+	}
+	return result
+}
+
+func parsePublicKeyRing(raw string) map[string]string {
+	if strings.TrimSpace(raw) == "" {
+		return map[string]string{}
+	}
+	var result map[string]string
+	if err := json.Unmarshal([]byte(raw), &result); err != nil || result == nil {
+		return map[string]string{}
 	}
 	return result
 }

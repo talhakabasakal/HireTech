@@ -105,7 +105,7 @@ Required validation commands:
   paginated audit connections, and transactional coupling between an admin
   write and its audit record are still production gaps.
 - GraphQL subscriptions and persisted-operation allowlisting remain deferred.
-- The current platform still uses HS256. Production should use strong managed secrets immediately and move to asymmetric keys with key IDs and rotation.
+- Development/test may use HS256, but production startup now requires RS256 with a managed RSA private key, `kid`-indexed public keys, and explicit key configuration. Retain old public keys only for a bounded rotation overlap and remove them after token expiry.
 - Development startup tolerates unavailable PostgreSQL/Redis for local iteration; with `APP_ENV=production`, startup now fails closed when either required security dependency is unavailable.
 - Authorization-version revocation and live membership revalidation remain future hardening work.
 - Invitation hashing currently derives from the configured application secret; production should use a separately managed, rotatable invitation-key ring.

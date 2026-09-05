@@ -2,7 +2,11 @@ package auth
 
 import (
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -17,27 +21,35 @@ import (
 type JWTService struct {
 	keys       map[string][]byte
 	activeKey  string
+	algorithm  string
+	privateKey *rsa.PrivateKey
+	publicKeys map[string]*rsa.PublicKey
+	initErr    error
 	expiration time.Duration
 	issuer     string
 }
 
 // NewJWTService creates a new JWTService from config.
 func NewJWTService(cfg config.JWTConfig) *JWTService {
+	algorithm := strings.ToUpper(strings.TrimSpace(cfg.Algorithm))
+	if algorithm == "" {
+		algorithm = "HS256"
+	}
 	keys := make(map[string][]byte)
 	for id, secret := range cfg.Keys {
 		if id != "" && secret != "" {
 			keys[id] = []byte(secret)
 		}
 	}
-	if cfg.Secret != "" {
+	if algorithm == "HS256" && cfg.Secret != "" {
 		keys["legacy"] = []byte(cfg.Secret)
 	}
 	activeKey := cfg.ActiveKeyID
-	if activeKey == "" || len(keys[activeKey]) == 0 {
+	if algorithm != "RS256" && (activeKey == "" || len(keys[activeKey]) == 0) {
 		activeKey = "legacy"
 	}
-	return &JWTService{
-		keys: keys, activeKey: activeKey,
+	service := &JWTService{
+		keys: keys, activeKey: activeKey, algorithm: algorithm,
 		expiration: func() time.Duration {
 			if cfg.AccessTokenMinutes > 0 {
 				return time.Duration(cfg.AccessTokenMinutes) * time.Minute
@@ -46,6 +58,70 @@ func NewJWTService(cfg config.JWTConfig) *JWTService {
 		}(),
 		issuer: cfg.Issuer,
 	}
+	if service.algorithm == "RS256" {
+		service.privateKey, service.initErr = parseRSAPrivateKey(cfg.PrivateKeyPEM)
+		if service.initErr == nil {
+			service.publicKeys, service.initErr = parseRSAPublicKeys(cfg.PublicKeys)
+		}
+	} else if service.algorithm != "HS256" {
+		service.initErr = fmt.Errorf("unsupported JWT algorithm %q", service.algorithm)
+	}
+	return service
+}
+
+// ValidateConfiguration reports key parsing errors before the HTTP listener is
+// started. It never includes key material in the returned error.
+func (s *JWTService) ValidateConfiguration() error {
+	if s == nil {
+		return fmt.Errorf("JWT service is nil")
+	}
+	return s.initErr
+}
+
+func parseRSAPrivateKey(raw string) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(raw))
+	if block == nil {
+		return nil, fmt.Errorf("invalid RSA private key PEM")
+	}
+	if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
+		return key, nil
+	}
+	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse RSA private key: %w", err)
+	}
+	key, ok := parsed.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("private key is not RSA")
+	}
+	return key, nil
+}
+
+func parseRSAPublicKeys(raw map[string]string) (map[string]*rsa.PublicKey, error) {
+	result := make(map[string]*rsa.PublicKey, len(raw))
+	for id, encoded := range raw {
+		block, _ := pem.Decode([]byte(encoded))
+		if block == nil {
+			return nil, fmt.Errorf("invalid RSA public key PEM for kid %q", id)
+		}
+		if key, err := x509.ParsePKIXPublicKey(block.Bytes); err == nil {
+			publicKey, ok := key.(*rsa.PublicKey)
+			if !ok {
+				return nil, fmt.Errorf("public key for kid %q is not RSA", id)
+			}
+			result[id] = publicKey
+			continue
+		}
+		publicKey, err := x509.ParsePKCS1PublicKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("parse RSA public key for kid %q: %w", id, err)
+		}
+		result[id] = publicKey
+	}
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no RSA public keys configured")
+	}
+	return result, nil
 }
 
 // customClaims extends JWT standard claims with our domain data.
@@ -81,6 +157,9 @@ func (s *JWTService) VerifyPassword(hashedPassword, password string) error {
 }
 
 func (s *JWTService) GenerateToken(_ context.Context, claims service.TokenClaims) (string, error) {
+	if err := s.ValidateConfiguration(); err != nil {
+		return "", err
+	}
 	now := time.Now().UTC()
 	authTime := claims.AuthenticationTime
 	if authTime.IsZero() {
@@ -110,9 +189,15 @@ func (s *JWTService) GenerateToken(_ context.Context, claims service.TokenClaims
 		AuthenticationTime:    jwt.NewNumericDate(authTime),
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, c)
+	var method jwt.SigningMethod = jwt.SigningMethodHS256
+	var signingKey interface{} = s.keys[s.activeKey]
+	if s.algorithm == "RS256" {
+		method = jwt.SigningMethodRS256
+		signingKey = s.privateKey
+	}
+	token := jwt.NewWithClaims(method, c)
 	token.Header["kid"] = s.activeKey
-	signed, err := token.SignedString(s.keys[s.activeKey])
+	signed, err := token.SignedString(signingKey)
 	if err != nil {
 		return "", fmt.Errorf("sign token: %w", err)
 	}
@@ -136,11 +221,24 @@ func firstAudience(audience []string) string {
 }
 
 func (s *JWTService) ValidateToken(_ context.Context, tokenStr string) (*service.TokenClaims, error) {
+	if err := s.ValidateConfiguration(); err != nil {
+		return nil, domainErr.New(domainErr.ErrUnauthorized, "invalid token configuration", err)
+	}
 	token, err := jwt.ParseWithClaims(tokenStr, &customClaims{}, func(t *jwt.Token) (interface{}, error) {
+		keyID, _ := t.Header["kid"].(string)
+		if s.algorithm == "RS256" {
+			if t.Method != jwt.SigningMethodRS256 {
+				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			}
+			key, ok := s.publicKeys[keyID]
+			if !ok {
+				return nil, fmt.Errorf("unknown signing key")
+			}
+			return key, nil
+		}
 		if t.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
-		keyID, _ := t.Header["kid"].(string)
 		if keyID == "" {
 			keyID = "legacy"
 		}

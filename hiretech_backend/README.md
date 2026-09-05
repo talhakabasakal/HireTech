@@ -284,7 +284,7 @@ For the complete trust model, accepted risks, and the **Security Controls Regist
 | **Outbound HTTP proxy** | Default `http.Client` followed redirects and had no timeout, risking custom header leakage | **No redirect following**, 30s timeout, response body capped at 1 MiB | Prevents `Authorization` or service tokens from being forwarded across hosts on redirect (CWE-522) |
 | **RBAC coverage** | JWT was required but any authenticated user could call admin routes; wildcard permissions in seed data were not honored | **`RequirePermission`** on all admin routes; wildcard-aware matching (`*`, `org:*`, `*:read`) | Ensures state-changing operations require explicit grants, not just a valid token (CWE-306) |
 | **Migration script** | `migrate.sh create NAME` did not sanitize `NAME`, allowing path traversal in filenames | Name restricted to **`[a-zA-Z0-9_]`** | Blocks `../` injection when migration files are created via automation (CWE-22) |
-| **JWT secret default** | Server could start with `change-me-in-production` | **Production startup rejection** for the default or shorter-than-32-character JWT secret | Prevents a known or weak signing secret from reaching a production listener |
+| **JWT key management** | Server could start with a known secret and HS256 signing | **Production startup rejection** for insecure secrets and HS256; RS256 PEM keys are parsed and selected by `kid` | Prevents weak/default signing configuration from reaching a production listener |
 | **Audit outbox delivery** | Transactional audit events could remain pending indefinitely | Bounded in-process relay projects pending rows idempotently into `audit_logs` | Keeps business mutation and durable audit projection reliable without adding a separate queue service |
 | **Gateway proxy (gosec G704)** | Intentional SSRF sink for operator-configured backend URLs | Documented as an **accepted risk** in SECURITY.md with audited `#nosec` suppressions | Proxying is a core gateway feature; risk is bounded by RBAC on endpoint creation |
 
@@ -308,8 +308,8 @@ Expected results on the hardened branch:
 
 Before exposing the API on a production network:
 
-1. Set **`APP_ENV=production`** and a strong, random **`JWT_SECRET`** of at least 32 characters (never use the default)
-2. For signing-key rotation, set **`JWT_KEYS=id1:secret1,id2:secret2`** and **`JWT_ACTIVE_KID=id2`**; retain old keys only during the overlap window
+1. Set **`APP_ENV=production`**, **`JWT_ALGORITHM=RS256`**, and configure a managed RSA private key in **`JWT_PRIVATE_KEY_PEM`**
+2. Configure **`JWT_PUBLIC_KEYS`** as a JSON object keyed by `kid`, and set **`JWT_ACTIVE_KID`** to the active key; retain old public keys only during the overlap window
 3. Set explicit **`CORS_ALLOWED_ORIGINS`** (avoid `*`)
 4. Enable **`DB_SSLMODE=require`** (or stricter)
 5. Require recent OTP/MFA authentication for AI administration and configuration approval
@@ -317,7 +317,8 @@ Before exposing the API on a production network:
 7. Replace default database credentials in any non-local deployment
 
 When `APP_ENV=production`, the server fails before opening its HTTP listener if
-the JWT secret is insecure or PostgreSQL/Redis cannot be initialized. Local
+the JWT algorithm or RSA key material is insecure/missing, or PostgreSQL/Redis
+cannot be initialized. Local
 development keeps the existing degraded-start behavior so `./dev.sh` can still
 start the server while infrastructure is being brought up.
 
@@ -367,8 +368,11 @@ All configuration is via environment variables with sensible defaults:
 | `KAFKA_NUM_PARTITIONS` | `3` | Default partitions for auto-created topics |
 | `KAFKA_REPLICATION_FACTOR` | `1` | Replication factor for auto-created topics |
 | `KAFKA_HOST_BIND` | `127.0.0.1` | Docker Compose host bind for Kafka (dev only) |
-| `JWT_SECRET` | `change-me-in-production` | JWT signing secret (**change before production**) |
-| `JWT_KEYS` | *(empty)* | Comma-separated retained signing keys as `kid:secret`; use with `JWT_ACTIVE_KID` |
+| `JWT_SECRET` | `change-me-in-production` | Legacy HS256 signing secret for development/test only |
+| `JWT_ALGORITHM` | `HS256` | JWT signing algorithm; production requires `RS256` |
+| `JWT_KEYS` | *(empty)* | Retained HS256 signing keys for development/test rotation |
+| `JWT_PRIVATE_KEY_PEM` | *(empty)* | RSA private key PEM for RS256; never log or commit |
+| `JWT_PUBLIC_KEYS` | *(empty)* | JSON object of `kid` to RSA public key PEM for RS256 |
 | `JWT_ACTIVE_KID` | `legacy` | `kid` used for newly issued JWTs |
 | `JWT_ACCESS_TOKEN_MINUTES` | `15` | Access-token lifetime |
 | `RECENT_AUTH_MINUTES` | `10` | Recent MFA window for AI administration and lifecycle actions |

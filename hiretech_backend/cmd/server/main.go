@@ -261,6 +261,9 @@ func buildDependencies(
 
 	// --- Services ---
 	jwtService := infraAuth.NewJWTService(cfg.JWT)
+	if err := jwtService.ValidateConfiguration(); err != nil {
+		return deps, fmt.Errorf("configure JWT service: %w", err)
+	}
 	rbacService := infraAuth.NewRBACService(roleRepo, redisClient)
 
 	deps.AuthService = jwtService

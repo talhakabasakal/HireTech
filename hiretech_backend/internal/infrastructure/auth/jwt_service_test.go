@@ -2,9 +2,14 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/masterfabric-go/masterfabric/internal/domain/iam/service"
 	"github.com/masterfabric-go/masterfabric/internal/shared/config"
@@ -18,6 +23,32 @@ func newTestJWTService() *JWTService {
 		ExpirationHours: 1,
 		Issuer:          "test",
 	})
+}
+
+func newRSATestJWTService(t *testing.T) *JWTService {
+	t.Helper()
+	privatePEM, publicPEM := generateRSAKeyPair(t)
+	return NewJWTService(config.JWTConfig{
+		Algorithm:     "RS256",
+		PrivateKeyPEM: privatePEM,
+		PublicKeys: map[string]string{
+			"rsa-test": publicPEM,
+		},
+		ActiveKeyID:        "rsa-test",
+		AccessTokenMinutes: 15,
+		Issuer:             "test",
+	})
+}
+
+func generateRSAKeyPair(t *testing.T) (string, string) {
+	t.Helper()
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	require.NoError(t, err)
+	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	require.NoError(t, err)
+	return string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privateKeyBytes})), string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicKeyBytes}))
 }
 
 func TestJWTService_HashAndVerifyPassword(t *testing.T) {
@@ -85,6 +116,84 @@ func TestJWTService_InvalidToken(t *testing.T) {
 
 	_, err := svc.ValidateToken(ctx, "invalid-token-string")
 	assert.Error(t, err)
+}
+
+func TestJWTService_RSA256GenerateAndValidateToken(t *testing.T) {
+	svc := newRSATestJWTService(t)
+	ctx := context.Background()
+
+	token, err := svc.GenerateToken(ctx, service.TokenClaims{UserID: uuid.New(), Email: "rsa@example.com"})
+	require.NoError(t, err)
+	parsedToken, parseErr := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		return &rsa.PublicKey{}, nil
+	})
+	require.Error(t, parseErr)
+	require.NotNil(t, parsedToken)
+	assert.Equal(t, "RS256", parsedToken.Method.Alg())
+
+	claims, err := svc.ValidateToken(ctx, token)
+	require.NoError(t, err)
+	assert.Equal(t, "rsa@example.com", claims.Email)
+}
+
+func TestJWTService_RSA256KeyRotationUsesKIDOverlap(t *testing.T) {
+	oldPrivate, oldPublic := generateRSAKeyPair(t)
+	newPrivate, newPublic := generateRSAKeyPair(t)
+	oldService := NewJWTService(config.JWTConfig{
+		Algorithm:          "RS256",
+		PrivateKeyPEM:      oldPrivate,
+		PublicKeys:         map[string]string{"old": oldPublic},
+		ActiveKeyID:        "old",
+		AccessTokenMinutes: 15,
+		Issuer:             "test",
+	})
+	rotatedService := NewJWTService(config.JWTConfig{
+		Algorithm:          "RS256",
+		PrivateKeyPEM:      newPrivate,
+		PublicKeys:         map[string]string{"old": oldPublic, "new": newPublic},
+		ActiveKeyID:        "new",
+		AccessTokenMinutes: 15,
+		Issuer:             "test",
+	})
+
+	oldToken, err := oldService.GenerateToken(context.Background(), service.TokenClaims{UserID: uuid.New()})
+	require.NoError(t, err)
+	newToken, err := rotatedService.GenerateToken(context.Background(), service.TokenClaims{UserID: uuid.New()})
+	require.NoError(t, err)
+	assert.NoError(t, func() error { _, err := rotatedService.ValidateToken(context.Background(), oldToken); return err }())
+	assert.NoError(t, func() error { _, err := rotatedService.ValidateToken(context.Background(), newToken); return err }())
+
+	retiredService := NewJWTService(config.JWTConfig{
+		Algorithm:          "RS256",
+		PrivateKeyPEM:      newPrivate,
+		PublicKeys:         map[string]string{"new": newPublic},
+		ActiveKeyID:        "new",
+		AccessTokenMinutes: 15,
+		Issuer:             "test",
+	})
+	_, err = retiredService.ValidateToken(context.Background(), oldToken)
+	assert.Error(t, err)
+}
+
+func TestJWTService_RSA256RejectsHMACToken(t *testing.T) {
+	hmacService := newTestJWTService()
+	rsaService := newRSATestJWTService(t)
+	token, err := hmacService.GenerateToken(context.Background(), service.TokenClaims{UserID: uuid.New()})
+	require.NoError(t, err)
+
+	_, err = rsaService.ValidateToken(context.Background(), token)
+	assert.Error(t, err)
+}
+
+func TestJWTService_RSA256RejectsInvalidKeyConfiguration(t *testing.T) {
+	service := NewJWTService(config.JWTConfig{
+		Algorithm:     "RS256",
+		PrivateKeyPEM: "not-a-key",
+		PublicKeys:    map[string]string{"rsa-test": "not-a-key"},
+		ActiveKeyID:   "rsa-test",
+	})
+
+	assert.Error(t, service.ValidateConfiguration())
 }
 
 func TestJWTService_WrongSecret(t *testing.T) {

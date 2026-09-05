@@ -8,6 +8,7 @@ import (
 )
 
 func TestLoad_Defaults(t *testing.T) {
+	t.Setenv("APP_ENV", "")
 	cfg := Load()
 
 	assert.Equal(t, EnvironmentDevelopment, cfg.Environment)
@@ -20,6 +21,14 @@ func TestLoad_Defaults(t *testing.T) {
 	assert.Equal(t, 6379, cfg.Redis.Port)
 	assert.Equal(t, "info", cfg.Log.Level)
 	assert.Equal(t, "json", cfg.Log.Format)
+}
+
+func TestLoad_PublicKeyRingEnvironment(t *testing.T) {
+	t.Setenv("JWT_PUBLIC_KEYS", `{"active":"public-key-pem"}`)
+
+	cfg := Load()
+
+	assert.Equal(t, map[string]string{"active": "public-key-pem"}, cfg.JWT.PublicKeys)
 }
 
 func TestConfig_ValidateForProductionRejectsDefaultJWTSecret(t *testing.T) {
@@ -39,9 +48,23 @@ func TestConfig_ValidateForProductionRejectsShortJWTSecret(t *testing.T) {
 }
 
 func TestConfig_ValidateForProductionAcceptsConfiguredJWTSecret(t *testing.T) {
-	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{Secret: "a-secure-production-secret-with-32-chars"}}
+	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{
+		Algorithm:     "RS256",
+		PrivateKeyPEM: "configured",
+		PublicKeys:    map[string]string{"active": "configured"},
+		ActiveKeyID:   "active",
+	}}
 
 	assert.NoError(t, cfg.ValidateForProduction())
+}
+
+func TestConfig_ValidateForProductionRejectsHS256(t *testing.T) {
+	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{
+		Secret:    "a-secure-production-secret-with-32-chars",
+		Algorithm: "HS256",
+	}}
+
+	assert.EqualError(t, cfg.ValidateForProduction(), "JWT_ALGORITHM must be RS256 in production")
 }
 
 func TestLoad_EnvironmentOverrides(t *testing.T) {

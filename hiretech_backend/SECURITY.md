@@ -75,8 +75,9 @@ Baseline security controls implemented on the `security/hardening` branch (July 
 
 | Variable | Purpose | Production guidance |
 | -------- | ------- | ------------------- |
-| `JWT_SECRET` | HS256 signing key | Required; never use the default value |
-| `JWT_KEYS` / `JWT_ACTIVE_KID` | Retained signing-key ring and active key id | Rotate with overlap; remove retired keys after all tokens expire |
+| `JWT_ALGORITHM` | JWT signing algorithm | Set to `RS256`; HS256 is rejected in production |
+| `JWT_PRIVATE_KEY_PEM` | Active RSA signing key | Load from a managed secret source; never log or commit |
+| `JWT_PUBLIC_KEYS` / `JWT_ACTIVE_KID` | `kid`-indexed RSA verification keys and active id | Rotate with overlap; remove retired public keys after all tokens expire |
 | `RECENT_AUTH_MINUTES` | Recent MFA window for privileged AI changes | Keep short and require OTP/MFA for admin writes |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated browser origins | Set explicit origins; avoid `*` |
 | `MAX_BODY_BYTES` | Request body cap | Keep at or below gateway policy limits |
@@ -87,7 +88,7 @@ Baseline security controls implemented on the `security/hardening` branch (July 
 
 When using masterfabric-go in production:
 
-- Change default `JWT_SECRET` to a strong, random value
+- Set `APP_ENV=production` and use managed RS256 key material
 - Use SSL/TLS for database connections (`DB_SSLMODE=require`)
 - Set `CORS_ALLOWED_ORIGINS` to explicit trusted origins
 - Enable rate limiting for production workloads via endpoint policies

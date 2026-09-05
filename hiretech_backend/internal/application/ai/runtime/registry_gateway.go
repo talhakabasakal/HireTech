@@ -113,10 +113,11 @@ func (g *RegistryGateway) providerFor(model *aiadminModel.Model, role aiModel.Ro
 	if gateway := g.providers[strings.ToLower(strings.TrimSpace(model.ProviderLabel))]; gateway != nil {
 		return gateway, nil
 	}
-	if gateway := g.roleFallback[aiadminModel.Role(role)]; gateway != nil {
-		return gateway, nil
-	}
-	return nil, fmt.Errorf("AI provider %s is not configured", model.ProviderLabel)
+	// A tenant-approved model must execute only through its registered
+	// provider. Falling back here could send the approved model identifier to
+	// an unrelated provider, so static role fallbacks are intentionally limited
+	// to the no-tenant/no-route path in staticFallback.
+	return nil, fmt.Errorf("AI provider %s is not configured for role %s", model.ProviderLabel, role)
 }
 
 func findRoute(workspace *aiadminModel.Workspace, role aiModel.Role) *aiadminModel.RoutingRule {

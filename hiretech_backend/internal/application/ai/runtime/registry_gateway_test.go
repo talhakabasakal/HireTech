@@ -104,3 +104,18 @@ func TestRegistryGatewayFallsBackToStaticGatewayWhenNoApprovedRoute(t *testing.T
 	require.Equal(t, "static", response.Content)
 	require.Len(t, static.requests, 1)
 }
+
+func TestRegistryGatewayDoesNotSendApprovedModelToUnrelatedProvider(t *testing.T) {
+	workspace := &aiadminModel.Workspace{
+		Models:  []*aiadminModel.Model{{ModelID: "approved-model", ProviderLabel: "managed-provider", Roles: []aiadminModel.Role{aiadminModel.RoleEvaluator}, Status: aiadminModel.ModelActive}},
+		Routing: []*aiadminModel.RoutingRule{{Role: aiadminModel.RoleEvaluator, PrimaryModelID: "approved-model", FallbackModelID: "", Enabled: true}},
+	}
+	static := &recordingGateway{response: aiModel.CompletionResponse{Content: "must-not-run"}}
+	gateway := NewRegistryGateway(&registryRepository{workspace: workspace}, nil, map[aiadminModel.Role]aiService.Gateway{aiadminModel.RoleEvaluator: static})
+	ctx := authcontext.WithActor(context.Background(), authcontext.ActorContext{UserID: uuid.New(), OrganizationID: uuid.New()})
+
+	_, err := gateway.Complete(ctx, aiModel.CompletionRequest{Role: aiModel.RoleEvaluator, Language: aiModel.LanguageEnglish, Messages: []aiModel.Message{{Role: "user", Content: "evaluate"}}})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "managed-provider")
+	require.Empty(t, static.requests)
+}

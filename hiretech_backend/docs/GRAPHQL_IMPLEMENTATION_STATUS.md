@@ -143,3 +143,6 @@ Provider endpoints are validated before use: loopback HTTP is allowed only for
 local development, remote endpoints must use HTTPS, and endpoint URLs cannot
 contain embedded credentials or fragments. Provider API keys remain process
 configuration and are never included in GraphQL payloads or audit metadata.
+When a tenant-approved registry route is active, each model must resolve to its
+declared provider; an unrelated static fallback provider is not used for that
+route. Missing provider wiring therefore fails closed.

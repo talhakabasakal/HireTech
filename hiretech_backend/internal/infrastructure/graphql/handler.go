@@ -3,6 +3,8 @@ package graphql
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -42,21 +44,25 @@ const (
 
 // Handler is the POST-only GraphQL transport with request-scoped limits.
 type Handler struct {
-	server       *handler.Server
-	timeout      time.Duration
-	maxBodyBytes int64
+	server                     *handler.Server
+	timeout                    time.Duration
+	maxBodyBytes               int64
+	requirePersistedOperations bool
+	allowedOperationHashes     map[string]struct{}
 }
 
 type Dependencies struct {
-	AuthService          service.AuthService
-	SessionValidator     service.SessionValidator
-	UseCase              *iamUsecase.OrganizationContextUseCase
-	InterviewUseCase     *interviewUsecase.InterviewService
-	EvaluationUseCase    *evaluationUsecase.EvaluationService
-	QuestionDraftUseCase *interviewUsecase.QuestionDraftService
-	AIAdminUseCase       *aiadminUsecase.Service
-	Timeout              time.Duration
-	MaxBodyBytes         int64
+	AuthService                service.AuthService
+	SessionValidator           service.SessionValidator
+	UseCase                    *iamUsecase.OrganizationContextUseCase
+	InterviewUseCase           *interviewUsecase.InterviewService
+	EvaluationUseCase          *evaluationUsecase.EvaluationService
+	QuestionDraftUseCase       *interviewUsecase.QuestionDraftService
+	AIAdminUseCase             *aiadminUsecase.Service
+	Timeout                    time.Duration
+	MaxBodyBytes               int64
+	RequirePersistedOperations bool
+	AllowedOperationHashes     []string
 }
 
 func NewHandler(deps Dependencies) *Handler {
@@ -83,7 +89,20 @@ func NewHandler(deps Dependencies) *Handler {
 	if timeout <= 0 {
 		timeout = DefaultTimeout
 	}
-	return &Handler{server: server, timeout: timeout, maxBodyBytes: deps.MaxBodyBytes}
+	allowedHashes := make(map[string]struct{}, len(deps.AllowedOperationHashes))
+	for _, hash := range deps.AllowedOperationHashes {
+		hash = strings.ToLower(strings.TrimSpace(hash))
+		if hash != "" {
+			allowedHashes[hash] = struct{}{}
+		}
+	}
+	return &Handler{
+		server:                     server,
+		timeout:                    timeout,
+		maxBodyBytes:               deps.MaxBodyBytes,
+		requirePersistedOperations: deps.RequirePersistedOperations,
+		allowedOperationHashes:     allowedHashes,
+	}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -104,11 +123,49 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", "invalid GraphQL request")
 		return
 	}
+	if err := h.validatePersistedOperation(body); err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", err.Error())
+		return
+	}
 	r.Body = io.NopCloser(bytes.NewReader(body))
 
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 	h.server.ServeHTTP(w, r.WithContext(ctx))
+}
+
+func (h *Handler) validatePersistedOperation(body []byte) error {
+	if h == nil || !h.requirePersistedOperations {
+		return nil
+	}
+	var request struct {
+		Query      string `json:"query"`
+		Extensions struct {
+			PersistedQuery struct {
+				Version    int    `json:"version"`
+				SHA256Hash string `json:"sha256Hash"`
+			} `json:"persistedQuery"`
+		} `json:"extensions"`
+	}
+	if err := json.Unmarshal(body, &request); err != nil || strings.TrimSpace(request.Query) == "" {
+		return errors.New("a persisted GraphQL operation is required")
+	}
+	persisted := request.Extensions.PersistedQuery
+	if persisted.Version != 1 || len(persisted.SHA256Hash) != sha256.Size*2 {
+		return errors.New("a valid persisted GraphQL operation hash is required")
+	}
+	hash := strings.ToLower(persisted.SHA256Hash)
+	if _, err := hex.DecodeString(hash); err != nil {
+		return errors.New("a valid persisted GraphQL operation hash is required")
+	}
+	digest := sha256.Sum256([]byte(request.Query))
+	if hash != hex.EncodeToString(digest[:]) {
+		return errors.New("persisted GraphQL operation hash does not match the query")
+	}
+	if _, ok := h.allowedOperationHashes[hash]; !ok {
+		return errors.New("persisted GraphQL operation is not allowlisted")
+	}
+	return nil
 }
 
 // AuthMiddleware builds the trusted actor context only from a verified JWT.

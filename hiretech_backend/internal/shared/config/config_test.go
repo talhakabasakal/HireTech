@@ -31,6 +31,16 @@ func TestLoad_PublicKeyRingEnvironment(t *testing.T) {
 	assert.Equal(t, map[string]string{"active": "public-key-pem"}, cfg.JWT.PublicKeys)
 }
 
+func TestLoad_PersistedOperationConfiguration(t *testing.T) {
+	t.Setenv("GRAPHQL_REQUIRE_PERSISTED_OPERATIONS", "true")
+	t.Setenv("GRAPHQL_ALLOWED_OPERATION_HASHES", "ABC,abc, 123")
+
+	cfg := Load()
+
+	assert.True(t, cfg.GraphQL.RequirePersistedOperations)
+	assert.Equal(t, []string{"abc", "123"}, cfg.GraphQL.AllowedOperationHashes)
+}
+
 func TestConfig_ValidateForProductionRejectsDefaultJWTSecret(t *testing.T) {
 	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{Secret: defaultJWTSecret}}
 
@@ -65,6 +75,17 @@ func TestConfig_ValidateForProductionRejectsHS256(t *testing.T) {
 	}}
 
 	assert.EqualError(t, cfg.ValidateForProduction(), "JWT_ALGORITHM must be RS256 in production")
+}
+
+func TestConfig_ValidateForProductionRequiresPersistedOperationHashesWhenEnabled(t *testing.T) {
+	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{
+		Algorithm:     "RS256",
+		PrivateKeyPEM: "configured",
+		PublicKeys:    map[string]string{"active": "configured"},
+		ActiveKeyID:   "active",
+	}, GraphQL: GraphQLConfig{RequirePersistedOperations: true}}
+
+	assert.EqualError(t, cfg.ValidateForProduction(), "GRAPHQL_ALLOWED_OPERATION_HASHES must be configured when persisted operations are required")
 }
 
 func TestAIConfig_ValidateForProductionRejectsSmoketestModel(t *testing.T) {

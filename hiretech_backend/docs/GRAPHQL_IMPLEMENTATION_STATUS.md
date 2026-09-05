@@ -111,7 +111,11 @@ Required validation commands:
   generic request audit projection are available. Monitored relay metrics,
   paginated audit connections, and a separately operated high-volume worker
   remain production hardening work.
-- GraphQL subscriptions and persisted-operation allowlisting remain deferred.
+- GraphQL subscriptions remain deferred. Persisted-operation hash allowlisting
+  is implemented behind `GRAPHQL_REQUIRE_PERSISTED_OPERATIONS`; keep it
+  disabled until `GRAPHQL_ALLOWED_OPERATION_HASHES` contains the reviewed
+  frontend hash manifest. Production startup fails closed when the gate is
+  enabled without a valid manifest.
 - Development/test may use HS256, but production startup now requires RS256 with a managed RSA private key, `kid`-indexed public keys, and explicit key configuration. Retain old public keys only for a bounded rotation overlap and remove them after token expiry.
 - Development startup tolerates unavailable PostgreSQL/Redis for local iteration; with `APP_ENV=production`, startup now fails closed when either required security dependency is unavailable.
 - Authorization-version revocation and live membership revalidation remain future hardening work.

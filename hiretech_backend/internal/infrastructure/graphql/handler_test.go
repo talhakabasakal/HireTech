@@ -2,6 +2,8 @@ package graphql_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -127,7 +129,7 @@ func (r *fakeAuditRepo) ListByResource(context.Context, string, string, int, int
 
 var _ auditRepo.AuditRepository = (*fakeAuditRepo)(nil)
 
-func newGraphHandler(t *testing.T) (*graphHTTP.Handler, *infraAuth.JWTService, uuid.UUID, uuid.UUID, uuid.UUID, *fakeAuditRepo) {
+func newGraphHandler(t *testing.T, persistedHashes ...string) (*graphHTTP.Handler, *infraAuth.JWTService, uuid.UUID, uuid.UUID, uuid.UUID, *fakeAuditRepo) {
 	t.Helper()
 	userID := uuid.New()
 	orgA, orgB := uuid.New(), uuid.New()
@@ -143,7 +145,7 @@ func newGraphHandler(t *testing.T) (*graphHTTP.Handler, *infraAuth.JWTService, u
 	jwtService := infraAuth.NewJWTService(config.JWTConfig{Secret: "graph-test-secret", ExpirationHours: 1, Issuer: "test"})
 	uc := usecase.NewOrganizationContextUseCase(users, organizations, memberships, jwtService, nil)
 	audit := &fakeAuditRepo{}
-	return graphHTTP.NewHandler(graphHTTP.Dependencies{AuthService: jwtService, UseCase: uc}), jwtService, userID, orgA, orgB, audit
+	return graphHTTP.NewHandler(graphHTTP.Dependencies{AuthService: jwtService, UseCase: uc, RequirePersistedOperations: len(persistedHashes) > 0, AllowedOperationHashes: persistedHashes}), jwtService, userID, orgA, orgB, audit
 }
 
 func token(t *testing.T, jwtService *infraAuth.JWTService, userID uuid.UUID, class authcontext.TokenClass, orgID uuid.UUID) string {
@@ -165,6 +167,23 @@ func perform(t *testing.T, h http.Handler, bearer, query string, headers map[str
 	for name, value := range headers {
 		req.Header.Set(name, value)
 	}
+	res := httptest.NewRecorder()
+	h.ServeHTTP(res, req)
+	var decoded graphResponse
+	require.NoError(t, json.Unmarshal(res.Body.Bytes(), &decoded), res.Body.String())
+	return decoded
+}
+
+func performPersisted(t *testing.T, h http.Handler, bearer, query, hash string) graphResponse {
+	t.Helper()
+	payload, err := json.Marshal(map[string]any{
+		"query":      query,
+		"extensions": map[string]any{"persistedQuery": map[string]any{"version": 1, "sha256Hash": hash}},
+	})
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPost, "/graphql", strings.NewReader(string(payload)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+bearer)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
 	var decoded graphResponse
@@ -234,6 +253,30 @@ func TestGraphQLOrganizationsAreMembershipScopedAndSelectionIssuesTenantToken(t 
 	assert.Contains(t, metadata, "operation_name")
 	assert.Contains(t, metadata, "duration_ms")
 	assert.NotContains(t, string(audit.entries[1].Metadata), "accessToken")
+}
+
+func TestGraphQLPersistedOperationGateRequiresMatchingAllowlistedHash(t *testing.T) {
+	query := "query PersistedMe { me { id } }"
+	digest := sha256.Sum256([]byte(query))
+	hash := hex.EncodeToString(digest[:])
+	h, jwtService, userID, _, _, _ := newGraphHandler(t, hash)
+	protected := middleware.RequestID(middleware.AuditLog(&fakeAuditRepo{})(graphHTTP.AuthMiddleware(jwtService)(h)))
+	bootstrap := token(t, jwtService, userID, authcontext.TokenClassBootstrap, uuid.Nil)
+
+	accepted := performPersisted(t, protected, bootstrap, query, hash)
+	assert.Empty(t, accepted.Errors)
+
+	missingHash := perform(t, protected, bootstrap, query, nil)
+	require.Len(t, missingHash.Errors, 1)
+	assert.Equal(t, "VALIDATION_FAILED", missingHash.Errors[0].Extensions["code"])
+
+	mismatched := performPersisted(t, protected, bootstrap, "query PersistedMe { me { email } }", hash)
+	require.Len(t, mismatched.Errors, 1)
+	assert.Equal(t, "VALIDATION_FAILED", mismatched.Errors[0].Extensions["code"])
+
+	unknown := performPersisted(t, protected, bootstrap, query, strings.Repeat("0", sha256.Size*2))
+	require.Len(t, unknown.Errors, 1)
+	assert.Equal(t, "VALIDATION_FAILED", unknown.Errors[0].Extensions["code"])
 }
 
 func TestGraphQLLimitsAliasesAndBatches(t *testing.T) {

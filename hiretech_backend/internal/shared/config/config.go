@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -21,6 +22,7 @@ type Config struct {
 	Email       EmailConfig
 	Kafka       KafkaConfig
 	WebSocket   WebSocketConfig
+	GraphQL     GraphQLConfig
 	Log         LogConfig
 	AI          AIConfig
 }
@@ -29,6 +31,7 @@ const (
 	EnvironmentDevelopment = "development"
 	EnvironmentProduction  = "production"
 	defaultJWTSecret       = "change-me-in-production"
+	sha256HashLength       = 64
 )
 
 // IsProduction reports whether production-only startup safeguards apply.
@@ -60,6 +63,19 @@ func (c *Config) ValidateForProduction() error {
 	if err := c.AI.ValidateForProduction(); err != nil {
 		return err
 	}
+	if c.GraphQL.RequirePersistedOperations && len(c.GraphQL.AllowedOperationHashes) == 0 {
+		return fmt.Errorf("GRAPHQL_ALLOWED_OPERATION_HASHES must be configured when persisted operations are required")
+	}
+	if c.GraphQL.RequirePersistedOperations {
+		for _, hash := range c.GraphQL.AllowedOperationHashes {
+			if len(hash) != sha256HashLength {
+				return fmt.Errorf("GRAPHQL_ALLOWED_OPERATION_HASHES must contain SHA-256 hashes")
+			}
+			if _, err := hex.DecodeString(hash); err != nil {
+				return fmt.Errorf("GRAPHQL_ALLOWED_OPERATION_HASHES must contain SHA-256 hashes")
+			}
+		}
+	}
 	return nil
 }
 
@@ -82,6 +98,12 @@ type WebSocketConfig struct {
 	PingIntervalSec int
 	ReadBufferSize  int
 	WriteBufferSize int
+}
+
+// GraphQLConfig controls optional production operation allowlisting.
+type GraphQLConfig struct {
+	RequirePersistedOperations bool
+	AllowedOperationHashes     []string
 }
 
 // ServerConfig holds HTTP server settings.
@@ -286,6 +308,10 @@ func Load() *Config {
 			ReadBufferSize:  envOrDefaultInt("WS_READ_BUFFER_SIZE", 1024),
 			WriteBufferSize: envOrDefaultInt("WS_WRITE_BUFFER_SIZE", 1024),
 		},
+		GraphQL: GraphQLConfig{
+			RequirePersistedOperations: envOrDefault("GRAPHQL_REQUIRE_PERSISTED_OPERATIONS", "false") == "true",
+			AllowedOperationHashes:     parseHashList(os.Getenv("GRAPHQL_ALLOWED_OPERATION_HASHES")),
+		},
 		Log: LogConfig{
 			Level:  envOrDefault("LOG_LEVEL", "info"),
 			Format: envOrDefault("LOG_FORMAT", "json"),
@@ -332,6 +358,26 @@ func parsePublicKeyRing(raw string) map[string]string {
 	var result map[string]string
 	if err := json.Unmarshal([]byte(raw), &result); err != nil || result == nil {
 		return map[string]string{}
+	}
+	return result
+}
+
+func parseHashList(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	result := make([]string, 0)
+	for _, value := range strings.Split(raw, ",") {
+		hash := strings.ToLower(strings.TrimSpace(value))
+		if hash == "" {
+			continue
+		}
+		if _, ok := seen[hash]; ok {
+			continue
+		}
+		seen[hash] = struct{}{}
+		result = append(result, hash)
 	}
 	return result
 }

@@ -36,7 +36,7 @@ Status values:
 | GraphQL pagination | REST page/per-page | Opaque cursor connections with bounded page size | Missing | 1 |
 | GraphQL request limits | Body, operation, depth, node, alias, fragment, complexity, introspection, and timeout limits | Same controls with regression coverage | Implemented; protect with tests | 0 onward |
 | Resolver batching | None | Request-scoped, tenant-keyed DataLoaders | Missing | 1 |
-| Persisted operations | None | Production frontend allowlist after schema stabilization | Missing | 5/hardening |
+| Persisted operations | Optional fail-closed SHA-256 allowlist gate and frontend hash emission are implemented; disabled until a reviewed manifest is provisioned | Production frontend allowlist after schema stabilization | Partial | Provision reviewed hashes and enable in production |
 | Frontend API client | Hand-written typed adapters and GraphQL documents behind a dependency-composed API mode | Generated typed GraphQL client behind a frontend adapter | Partial | After backend Increment 1 |
 
 ## 3. Authentication and tenant gaps

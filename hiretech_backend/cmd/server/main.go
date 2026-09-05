@@ -363,15 +363,17 @@ func buildDependencies(
 	deps.APIMgmtHandler = apimgmtHandler.NewHandler(defineEndpointUC, updatePolicyUC, retireEndpointUC, activateEndpointUC, endpointRepo, policyRepo)
 	deps.AuditHandler = auditHandler.NewHandler(auditRepo)
 	deps.GraphQLHandler = graphqlInfra.NewHandler(graphqlInfra.Dependencies{
-		AuthService:          jwtService,
-		SessionValidator:     securityUC,
-		UseCase:              organizationContextUC,
-		InterviewUseCase:     interviewService,
-		EvaluationUseCase:    evaluationService,
-		QuestionDraftUseCase: questionDraftService,
-		AIAdminUseCase:       aiadminService,
-		Timeout:              5 * time.Second,
-		MaxBodyBytes:         cfg.Server.MaxBodyBytes,
+		AuthService:                jwtService,
+		SessionValidator:           securityUC,
+		UseCase:                    organizationContextUC,
+		InterviewUseCase:           interviewService,
+		EvaluationUseCase:          evaluationService,
+		QuestionDraftUseCase:       questionDraftService,
+		AIAdminUseCase:             aiadminService,
+		Timeout:                    5 * time.Second,
+		MaxBodyBytes:               cfg.Server.MaxBodyBytes,
+		RequirePersistedOperations: cfg.GraphQL.RequirePersistedOperations,
+		AllowedOperationHashes:     cfg.GraphQL.AllowedOperationHashes,
 	})
 
 	// --- WebSocket real-time hub ---

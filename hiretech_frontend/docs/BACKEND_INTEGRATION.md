@@ -77,6 +77,13 @@ additionally requires `audit:read`. A backend without the AI administration
 dependencies returns an explicit capability error; the frontend does not
 substitute demo state in API mode.
 
+When the backend enables its production persisted-operation gate, set
+`NEXT_PUBLIC_GRAPHQL_PERSISTED_OPERATIONS=true`. The API client then sends a
+SHA-256 hash extension with each GraphQL document; the backend accepts only
+hashes present in `GRAPHQL_ALLOWED_OPERATION_HASHES` and fails closed on a
+missing, mismatched, or unknown hash. Keep the gate disabled until the
+deployment manifest contains the reviewed hash set.
+
 ## Repository mapping
 
 | Frontend adapter | Backend contract |

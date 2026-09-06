@@ -52,9 +52,9 @@ services:
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
-        value: "587"
+        value: "465"
       - key: SMTP_TLS_MODE
-        value: starttls
+        value: implicit
       - key: SMTP_USERNAME
         sync: false
       - key: SMTP_PASSWORD

@@ -145,6 +145,7 @@ npm run typecheck
 npm run persisted-operations:check
 npm run build
 npm run test:e2e
+npm run test:e2e:backend # requires the local backend and Mailpit
 ```
 
 `npm run typecheck` is intentionally separate from the Next.js build so a

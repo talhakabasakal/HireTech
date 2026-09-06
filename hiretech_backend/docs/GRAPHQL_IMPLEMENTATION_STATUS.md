@@ -169,6 +169,11 @@ Required validation commands:
   artifact retention, and interoperability evidence remain release gates.
 - Retention, deletion, legal-hold, and candidate export workflows are not part of this phase.
 - The integration gate exercises the complete PostgreSQL interview/evaluation/audit lifecycle and the shared Redis rate limiter against real services. It fails when `INTERVIEW_TEST_DSN` or `REDIS_TEST_ADDR` is absent; invoking `go test ./...` directly still skips those environment-gated tests by design.
+- The frontend now has a separate API-mode Playwright authentication gate that
+  reads a synthetic OTP from Mailpit. Its code is linted and typechecked, but
+  execution in this workspace is blocked by Docker host-port forwarding;
+  rerun `npm run test:e2e:backend` after the backend is reachable on
+  `127.0.0.1:8080` and Mailpit on `127.0.0.1:8025`.
 
 ## Model-serving prerequisite and next phase
 

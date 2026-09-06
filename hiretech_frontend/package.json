@@ -17,6 +17,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
+    "test:e2e:backend": "playwright test --config playwright.backend.config.ts",
     "persisted-operations:generate": "node scripts/persisted-operations.mjs --write",
     "persisted-operations:check": "node scripts/persisted-operations.mjs --check",
     "persisted-operations:env": "node scripts/persisted-operations.mjs --env",

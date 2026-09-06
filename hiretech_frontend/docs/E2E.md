@@ -27,3 +27,18 @@ sleeps.
 This smoke test does not prove backend authorization, PostgreSQL migrations,
 real email delivery, production model serving, WebSocket subscriptions, or
 Electron installer signing. Those remain separate release gates.
+
+## Real backend authentication gate
+
+With the backend running on `127.0.0.1:8080` and Mailpit on
+`127.0.0.1:8025`, run:
+
+```bash
+npm run test:e2e:backend
+```
+
+This separate suite starts the renderer in explicit `api` mode, signs in with
+a synthetic reserved account, reads the newly delivered OTP from Mailpit, and
+verifies successful login, OTP request, OTP verification, and authenticated
+`/me` responses. It does not accept mock data as evidence and never uses a
+real candidate identity.

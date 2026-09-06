@@ -37,7 +37,7 @@ Status values:
 | GraphQL request limits | Body, operation, depth, node, alias, fragment, complexity, introspection, and timeout limits | Same controls with regression coverage | Implemented; protect with tests | 0 onward |
 | Resolver batching | None | Request-scoped, tenant-keyed DataLoaders | Missing | 1 |
 | Persisted operations | Optional fail-closed SHA-256 gate, frontend hash emission, deterministic reviewed manifest, drift check, and deployment-safe env rendering are implemented | Coordinated production activation after release approval | Implemented; rollout pending | Review the generated manifest and enable both release flags together |
-| Frontend API client | Hand-written typed adapters and GraphQL documents behind a dependency-composed API mode | Generated typed GraphQL client behind a frontend adapter | Partial | After backend Increment 1 |
+| Frontend API client | Hand-written typed adapters and GraphQL documents behind a dependency-composed API mode; API-mode OTP E2E gate added | Generated typed GraphQL client behind a frontend adapter and full backend-connected lifecycle E2E | Partial | Run the API-mode gate in a reachable backend/Mailpit environment; expand to interview lifecycle |
 
 ## 3. Authentication and tenant gaps
 

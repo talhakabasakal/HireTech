@@ -70,7 +70,7 @@ The current schema supports these frontend operation groups:
   `recordHumanReview`
 - AI administration: `adminWorkspace`, `registerAdminModel`,
   `createAdminPromptVersion`, `updateAdminRouting`, and `publishAdminRubric`
-- interview lifecycle subscription: `interviewUpdated(interviewId)`
+- interview lifecycle subscription: `interviewUpdated(interviewId, after)`; persist the returned opaque `cursor` and send it as `after` on reconnect
 
 The backend still enforces token class, organization scope, and permission at
 the resolver/use-case boundary. The admin operations require a tenant token and
@@ -128,8 +128,9 @@ the schema's generated names (`competencyIds`, `timeLimitSeconds`,
 
 - Candidate feedback has no backend mutation in the current schema, so the API
   adapter returns `BACKEND_CONTRACT_MISSING` instead of pretending to save it.
-- `interviewUpdated` carries lifecycle metadata only. It is not a chat stream,
-  has no durable reconnect cursor yet, and does not replace `/api/v1/ws`.
+- `interviewUpdated` carries lifecycle metadata and an opaque, bounded durable
+  reconnect cursor. Expired or trimmed cursors require an authoritative refetch;
+  this is not a chat stream and does not replace `/api/v1/ws`.
 - Model/provider credentials never enter the renderer. Model IDs and
   configuration are sent only to the protected admin GraphQL operations.
 - Mock repositories remain available for offline demos and do not represent

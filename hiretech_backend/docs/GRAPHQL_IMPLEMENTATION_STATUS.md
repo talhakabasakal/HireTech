@@ -30,10 +30,12 @@ Phase 4 and Phase 5 add:
 - `adminAuditEvents(first, after)` provides an independently bounded,
   tenant-scoped keyset connection for audit history; it requires `audit:read`,
   recent authentication/MFA, and a cursor-capable audit repository.
-- `interviewUpdated(interviewId)` provides a candidate-safe GraphQL
+- `interviewUpdated(interviewId, after)` provides a candidate-safe GraphQL
   subscription over the existing event bus. It is served on the `/graphql`
   WebSocket upgrade route using `graphql-transport-ws`, with explicit
-  organization/interview scope and bounded in-process subscription capacity.
+  organization/interview scope, a bounded Redis-backed replay window, and
+  bounded in-process subscription capacity. Each update includes an opaque
+  reconnect cursor.
 
 The schema remains source-controlled at `graph/schema.graphqls`; gqlgen transport code is generated under `graph/generated` and `graph/model`. Resolvers are thin adapters over application services.
 
@@ -145,9 +147,11 @@ Required validation commands:
   runs in API instances or a separately deployed process remain production
   operations decisions. Retention and integrity verification remain hardening
   work.
-- `interviewUpdated` is implemented for lifecycle notifications. A durable
-  reconnect cursor and evaluation-specific streams remain future work. When
-  Kafka is enabled, consumers now start only after subscription handlers are
+- `interviewUpdated` is implemented for lifecycle notifications with a durable,
+  tenant/interview-scoped Redis replay cursor bounded to five minutes and 64
+  events; expired or trimmed cursors require an authoritative refetch.
+  Evaluation-specific streams remain future work. When Kafka is enabled,
+  consumers now start only after subscription handlers are
   registered and use an instance-scoped group, so every API replica receives
   lifecycle events for its own sockets. Production fails closed instead of
   silently degrading to an in-process bus when enabled Kafka is unavailable.
@@ -170,10 +174,9 @@ Required validation commands:
 - Retention, deletion, legal-hold, and candidate export workflows are not part of this phase.
 - The integration gate exercises the complete PostgreSQL interview/evaluation/audit lifecycle and the shared Redis rate limiter against real services. It fails when `INTERVIEW_TEST_DSN` or `REDIS_TEST_ADDR` is absent; invoking `go test ./...` directly still skips those environment-gated tests by design.
 - The frontend now has a separate API-mode Playwright authentication gate that
-  reads a synthetic OTP from Mailpit. Its code is linted and typechecked, but
-  execution in this workspace is blocked by Docker host-port forwarding;
-  rerun `npm run test:e2e:backend` after the backend is reachable on
-  `127.0.0.1:8080` and Mailpit on `127.0.0.1:8025`.
+  reads a synthetic OTP from Mailpit. The real backend/Mailpit flow passed in a
+  bounded Docker-network browser run; the host-port forwarding workaround is
+  environment-specific and does not change the release gate.
 - A bounded AI benchmark runner verifies the frozen interviewer/evaluator test
   split hashes and validates model responses against the role-specific JSON
   Schema. It records only contract, prohibited-decision, latency, and token

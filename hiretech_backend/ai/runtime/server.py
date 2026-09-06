@@ -7,6 +7,7 @@ same /v1/chat/completions contract used by hosted providers.
 from __future__ import annotations
 
 import os
+import json
 import time
 import uuid
 from pathlib import Path
@@ -25,10 +26,21 @@ BASE_MODEL = os.getenv(
     "microsoft/Phi-4-mini-instruct" if ROLE == "interviewer" else "Qwen/Qwen3-4B",
 )
 ADAPTER_PATH = Path(os.getenv("AI_ADAPTER_PATH", f"/app/adapters/{ROLE}"))
+ADAPTER_ID = os.getenv("AI_ADAPTER_ID", "")
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_HUB_TOKEN") or None
 HOST = os.getenv("AI_HOST", "127.0.0.1")
 PORT = int(os.getenv("AI_PORT", "8001"))
 MAX_NEW_TOKENS = int(os.getenv("AI_MAX_NEW_TOKENS", "2048"))
 API_KEY = os.getenv("AI_API_KEY", "")
+
+CONTRACT_REQUIRED = {
+    "interviewer": {"schema_version", "response_id", "interview_id", "turn_id", "action", "message", "question", "observations", "tool_requests", "safety", "confidence", "human_review", "next_state"},
+    "evaluator": {"schema_version", "evaluation_id", "interview_id", "rubric_id", "rubric_version", "criterion_scores", "overall_score", "overall_confidence", "summary", "data_quality", "integrity_checks", "human_review", "report_disposition"},
+}
+CONTRACT_INSTRUCTION = {
+    "interviewer": "Return exactly one JSON object for the HireTech interviewer-output contract v1.0.0. Use every required field, no markdown or extra fields, no chain-of-thought, and never make a hiring decision.",
+    "evaluator": "Return exactly one JSON object for the HireTech evaluator-output contract v1.0.0. Use every required field, no markdown or extra fields, only resolved job-relevant evidence, and never make a hiring decision.",
+}
 
 
 class Message(BaseModel):
@@ -60,8 +72,26 @@ def _auth_ok(authorization: str | None) -> bool:
     return not API_KEY or authorization == f"Bearer {API_KEY}"
 
 
+def _contract_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    instruction = CONTRACT_INSTRUCTION[ROLE]
+    if any(item.get("role") == "system" and instruction in item.get("content", "") for item in messages):
+        return messages
+    return [{"role": "system", "content": instruction}, *messages]
+
+
+def _validate_contract(content: str) -> None:
+    try:
+        value = json.loads(content.strip())
+    except json.JSONDecodeError as exc:
+        raise ValueError("model output is not valid JSON") from exc
+    if not isinstance(value, dict) or set(value) != CONTRACT_REQUIRED[ROLE] or value.get("schema_version") != "1.0.0":
+        raise ValueError("model output does not match the role contract")
+    if ROLE == "evaluator" and value.get("report_disposition") == "READY_FOR_HUMAN_DECISION" and value.get("human_review", {}).get("required") is not True:
+        raise ValueError("human decision report requires human review")
+
+
 def _load_model() -> tuple[Any, Any, torch.device]:
-    if not ADAPTER_PATH.is_dir():
+    if not ADAPTER_ID and not ADAPTER_PATH.is_dir():
         raise RuntimeError(f"QLoRA adapter directory not found: {ADAPTER_PATH}")
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA GPU is required for the bundled QLoRA runtime")
@@ -73,10 +103,14 @@ def _load_model() -> tuple[Any, Any, torch.device]:
         bnb_4bit_use_double_quant=True,
         bnb_4bit_compute_dtype=compute_dtype,
     )
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, use_fast=True, trust_remote_code=False)
-    template_path = ADAPTER_PATH / "chat_template.jinja"
-    if template_path.is_file():
-        tokenizer.chat_template = template_path.read_text(encoding="utf-8")
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, use_fast=True, trust_remote_code=False, token=HF_TOKEN)
+    if ADAPTER_ID:
+        adapter_source = ADAPTER_ID
+    else:
+        adapter_source = str(ADAPTER_PATH)
+        template_path = ADAPTER_PATH / "chat_template.jinja"
+        if template_path.is_file():
+            tokenizer.chat_template = template_path.read_text(encoding="utf-8")
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -85,8 +119,9 @@ def _load_model() -> tuple[Any, Any, torch.device]:
         quantization_config=quantization,
         device_map="auto",
         trust_remote_code=False,
+        token=HF_TOKEN,
     )
-    model = PeftModel.from_pretrained(model, str(ADAPTER_PATH), is_trainable=False)
+    model = PeftModel.from_pretrained(model, adapter_source, is_trainable=False, token=HF_TOKEN)
     model.eval()
     return tokenizer, model, next(model.parameters()).device
 
@@ -97,7 +132,7 @@ TOKENIZER, MODEL, DEVICE = _load_model()
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "role": ROLE, "model": BASE_MODEL, "adapter": str(ADAPTER_PATH)}
+    return {"status": "ok", "role": ROLE, "model": BASE_MODEL, "adapter": ADAPTER_ID or str(ADAPTER_PATH)}
 
 
 @app.get("/v1/models")
@@ -112,7 +147,7 @@ def chat_completions(request: ChatRequest, authorization: str | None = Header(de
     if request.model and request.model != BASE_MODEL:
         raise HTTPException(status_code=400, detail="model is not served by this role endpoint")
 
-    messages = [{"role": item.role, "content": _content(item.content)} for item in request.messages]
+    messages = _contract_messages([{"role": item.role, "content": _content(item.content)} for item in request.messages])
     try:
         try:
             prompt = TOKENIZER.apply_chat_template(
@@ -143,6 +178,10 @@ def chat_completions(request: ChatRequest, authorization: str | None = Header(de
     prompt_tokens = int(encoded["input_ids"].shape[-1])
     output_tokens = int(output.shape[-1] - prompt_tokens)
     content = _strip_thinking(TOKENIZER.decode(output[0][prompt_tokens:], skip_special_tokens=True))
+    try:
+        _validate_contract(content)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="model output failed the role contract") from exc
     return {
         "id": f"hiretech-{uuid.uuid4().hex}",
         "object": "chat.completion",

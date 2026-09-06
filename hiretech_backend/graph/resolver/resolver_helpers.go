@@ -4,6 +4,7 @@ import (
 	"github.com/masterfabric-go/masterfabric/graph/generated"
 	"github.com/masterfabric-go/masterfabric/graph/model"
 	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
+	"github.com/masterfabric-go/masterfabric/internal/shared/permissions"
 )
 
 func notConfigured(name string) error {
@@ -22,6 +23,15 @@ func stringOrEmptyQuestionSource(value *model.QuestionSource) string {
 		return ""
 	}
 	return string(*value)
+}
+
+func hasPermission(granted []string, required string) bool {
+	for _, value := range granted {
+		if permissions.Matches(value, required) {
+			return true
+		}
+	}
+	return false
 }
 
 var _ generated.InterviewResolver = (*interviewResolver)(nil)

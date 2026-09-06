@@ -12,6 +12,7 @@ import (
 type InterviewUpdate struct {
 	OrganizationID uuid.UUID
 	InterviewID    uuid.UUID
+	Cursor         string
 	EventType      string
 	Status         string
 	Version        int

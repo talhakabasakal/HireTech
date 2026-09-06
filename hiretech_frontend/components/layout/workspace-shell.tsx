@@ -43,7 +43,7 @@ const navigation: Record<Area, NavigationGroup[]> = {
 
 function roleFromClaims(token: string | undefined): UserRole {
   const claims = decodeSessionToken(token);
-  return resolveRoleFromClaims(claims?.roles, claims?.permissions);
+  return resolveRoleFromClaims(claims?.roles, claims?.permissions, claims?.tokenClass);
 }
 
 function areaAllowsRole(area: Area, role: UserRole): boolean {

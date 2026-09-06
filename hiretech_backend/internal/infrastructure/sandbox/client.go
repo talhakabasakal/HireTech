@@ -45,6 +45,15 @@ func NewClient(httpClient *http.Client, endpoint, authToken string, verifiers ..
 	return &Client{httpClient: &client, endpoint: validatedEndpoint, authToken: strings.TrimSpace(authToken), maxBodyBytes: executionModel.MaxOutputBytes + 64*1024, verifyResult: verifyResult}, nil
 }
 
+// NewClientWithKeyRing is the production constructor. It makes the trust root
+// explicit and prevents callers from accidentally wiring a permissive stub.
+func NewClientWithKeyRing(httpClient *http.Client, endpoint, authToken string, keyRing *KeyRing) (*Client, error) {
+	if keyRing == nil {
+		return nil, errors.New("sandbox key ring is required")
+	}
+	return NewClient(httpClient, endpoint, authToken, keyRing.Verify)
+}
+
 func (c *Client) Execute(ctx context.Context, request executionModel.Request) (executionModel.Result, error) {
 	if c == nil {
 		return executionModel.Result{}, errors.New("sandbox client is not configured")

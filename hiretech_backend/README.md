@@ -371,6 +371,10 @@ All configuration is via environment variables with sensible defaults:
 | `AUDIT_RELAY_BATCH_SIZE` | `100` | Maximum outbox rows locked and projected per batch |
 | `AUDIT_RELAY_INTERVAL_MILLISECONDS` | `2000` | Delay between bounded relay cycles |
 | `AUDIT_RELAY_MAX_BATCHES_PER_CYCLE` | `10` | Maximum consecutive full batches drained before yielding |
+| `AUDIT_INTEGRITY_CHECK_ENABLED` | `true` | Run organization-scoped audit hash-chain verification |
+| `AUDIT_INTEGRITY_CHECK_INTERVAL_SECONDS` | `300` | Delay between bounded integrity verification cycles |
+| `AUDIT_INTEGRITY_PAGE_SIZE` | `100` | Organization page size used by the verifier |
+| `AUDIT_INTEGRITY_MAX_ORGANIZATIONS` | `1000` | Fail closed if one cycle would verify more organizations than this |
 | `KAFKA_ENABLED` | `false` | Enable Kafka event bus |
 | `KAFKA_BROKERS` | `localhost:9092` | Kafka broker addresses (comma-separated) |
 | `KAFKA_GROUP_ID` | `masterfabric-go` | Kafka consumer group ID |

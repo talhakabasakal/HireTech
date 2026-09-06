@@ -41,8 +41,9 @@ The subscription operation is:
 
 ```graphql
 subscription InterviewUpdates($interviewId: UUID!) {
-  interviewUpdated(interviewId: $interviewId) {
+  interviewUpdated(interviewId: $interviewId, after: null) {
     interviewId
+    cursor
     eventType
     status
     version
@@ -58,12 +59,17 @@ payloads are never broadcast. Tenant-selection headers are rejected and the
 browser `Origin` must match `CORS_ALLOWED_ORIGINS` explicitly.
 
 The broker caps active streams at `WS_MAX_CONNECTIONS` and uses a small bounded
-per-stream buffer. A full buffer drops the advisory update and logs the
-condition; the database lifecycle state remains authoritative. When Kafka is
-enabled, each API instance consumes with its own group suffix, so the same
-lifecycle event reaches every replica's local sockets. Clients must still
-refetch current state after reconnect because a durable replay cursor is not
-implemented yet.
+per-stream buffer. Interview lifecycle updates are retained in a tenant- and
+interview-scoped Redis Stream with a five-minute expiry and a maximum of 64
+events. Each payload includes an opaque signed cursor; clients send the last
+cursor as `after` on the subscription to replay events strictly after it. A
+tampered, expired, trimmed, or over-limit cursor fails the subscription and the
+client must refetch authoritative interview state. A full live buffer drops
+the advisory update and logs the condition. When Kafka is enabled, each API
+instance consumes with its own group suffix, so the same lifecycle event
+reaches every replica's local sockets. Local development without Redis uses a
+bounded process-local fallback and therefore does not provide cross-instance
+replay durability.
 
 ## Design principles
 

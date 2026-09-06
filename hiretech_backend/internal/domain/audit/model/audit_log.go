@@ -21,4 +21,8 @@ type AuditLog struct {
 	IPAddress      string     `json:"ip_address"`
 	UserAgent      string     `json:"user_agent"`
 	CreatedAt      time.Time  `json:"created_at"`
+	PreviousHash   string     `json:"previous_hash,omitempty"`
+	EntryHash      string     `json:"entry_hash,omitempty"`
+	RetentionUntil time.Time  `json:"retention_until,omitempty"`
+	LegalHold      bool       `json:"legal_hold"`
 }

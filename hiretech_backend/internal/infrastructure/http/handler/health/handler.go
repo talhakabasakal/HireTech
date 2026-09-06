@@ -27,7 +27,14 @@ type redisPinger interface {
 
 // NewHandler creates a new health handler.
 func NewHandler(db *pgxpool.Pool, redis *redis.Client) *Handler {
-	return &Handler{db: db, redis: redis}
+	handler := &Handler{}
+	if db != nil {
+		handler.db = db
+	}
+	if redis != nil {
+		handler.redis = redis
+	}
+	return handler
 }
 
 // HealthResponse is the JSON structure for health checks.
@@ -56,6 +63,9 @@ func (h *Handler) Readiness(w http.ResponseWriter, r *http.Request) {
 		} else {
 			services["postgres"] = "healthy"
 		}
+	} else {
+		services["postgres"] = "unavailable"
+		healthy = false
 	}
 
 	// Check Redis
@@ -67,6 +77,9 @@ func (h *Handler) Readiness(w http.ResponseWriter, r *http.Request) {
 		} else {
 			services["redis"] = "healthy"
 		}
+	} else {
+		services["redis"] = "unavailable"
+		healthy = false
 	}
 
 	status := "ready"

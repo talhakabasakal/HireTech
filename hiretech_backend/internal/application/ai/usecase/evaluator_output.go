@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -98,7 +100,7 @@ func ParseEvaluatorOutput(raw []byte, expectedEvaluationID, expectedInterviewID 
 	if output.SchemaVersion != "1.0.0" || output.EvaluationID != expectedEvaluationID.String() || output.InterviewID != expectedInterviewID.String() {
 		return nil, fmt.Errorf("%w: evaluation scope or schema mismatch", ErrInvalidEvaluatorOutput)
 	}
-	if strings.TrimSpace(output.RubricID) == "" || strings.TrimSpace(output.RubricVersion) == "" {
+	if strings.TrimSpace(output.RubricID) == "" || !regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,127}$`).MatchString(output.RubricID) || !regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`).MatchString(output.RubricVersion) {
 		return nil, fmt.Errorf("%w: rubric metadata is required", ErrInvalidEvaluatorOutput)
 	}
 	if len(output.CriterionScores) == 0 || len(output.CriterionScores) > 20 {
@@ -123,7 +125,14 @@ func ParseEvaluatorOutput(raw []byte, expectedEvaluationID, expectedInterviewID 
 	if !output.HumanReview.Required && (output.HumanReview.Urgency != "NONE" || len(output.HumanReview.ReasonCodes) != 0 || len(output.HumanReview.ReviewQuestions) != 0) {
 		return nil, fmt.Errorf("%w: optional human review contains review data", ErrInvalidEvaluatorOutput)
 	}
+	seenCriteria := make(map[string]struct{}, len(output.CriterionScores))
+	weightedScore := 0.0
+	weightTotal := 0.0
 	for _, criterion := range output.CriterionScores {
+		if _, exists := seenCriteria[criterion.CriterionID]; exists {
+			return nil, fmt.Errorf("%w: duplicate criterion %q", ErrInvalidEvaluatorOutput, criterion.CriterionID)
+		}
+		seenCriteria[criterion.CriterionID] = struct{}{}
 		if strings.TrimSpace(criterion.CriterionID) == "" || criterion.MaximumScore != 4 || criterion.Confidence.Score < 0 || criterion.Confidence.Score > 1 || strings.TrimSpace(criterion.Rationale) == "" {
 			return nil, fmt.Errorf("%w: invalid criterion %q", ErrInvalidEvaluatorOutput, criterion.CriterionID)
 		}
@@ -131,12 +140,37 @@ func ParseEvaluatorOutput(raw []byte, expectedEvaluationID, expectedInterviewID 
 			return nil, err
 		}
 		if criterion.Applicable {
-			if criterion.Score == nil || *criterion.Score < 0 || *criterion.Score > 4 || (*criterion.Score*2) != float64(int(*criterion.Score*2)) || criterion.Weight <= 0 || len(criterion.EvidenceReferences) == 0 {
+			if criterion.Score == nil || *criterion.Score < 0 || *criterion.Score > 4 || (*criterion.Score*2) != float64(int(*criterion.Score*2)) || criterion.Weight <= 0 || criterion.Weight > 1 || len(criterion.EvidenceReferences) == 0 {
 				return nil, fmt.Errorf("%w: applicable criterion %q is incomplete", ErrInvalidEvaluatorOutput, criterion.CriterionID)
 			}
+			weightedScore += *criterion.Score * criterion.Weight
+			weightTotal += criterion.Weight
 		} else if criterion.Score != nil || criterion.Weight != 0 || len(criterion.EvidenceReferences) != 0 || len(criterion.Limitations) == 0 {
 			return nil, fmt.Errorf("%w: non-applicable criterion %q is inconsistent", ErrInvalidEvaluatorOutput, criterion.CriterionID)
 		}
+	}
+	if weightTotal > 1.000001 {
+		return nil, fmt.Errorf("%w: criterion weights exceed one", ErrInvalidEvaluatorOutput)
+	}
+	if !output.IntegrityChecks.AllEvidenceReferencesResolved || !output.IntegrityChecks.RubricOnlyScoring || !output.IntegrityChecks.ProtectedAttributesExcluded || !output.IntegrityChecks.InterviewerOpinionExcluded {
+		if !output.HumanReview.Required {
+			return nil, fmt.Errorf("%w: failed integrity checks must trigger human review", ErrInvalidEvaluatorOutput)
+		}
+	}
+	if !output.DataQuality.SufficientForScoring {
+		if output.OverallScore != nil || output.ReportDisposition != "REVIEW_REQUIRED" || !output.HumanReview.Required {
+			return nil, fmt.Errorf("%w: insufficient data quality requires a review-only report", ErrInvalidEvaluatorOutput)
+		}
+	} else if weightTotal == 0 {
+		return nil, fmt.Errorf("%w: sufficient report has no applicable weighted criterion", ErrInvalidEvaluatorOutput)
+	} else {
+		expectedScore := weightedScore / weightTotal / 4 * 100
+		if output.OverallScore == nil || math.Abs(*output.OverallScore-expectedScore) > 0.01 {
+			return nil, fmt.Errorf("%w: overall score does not match rubric weights", ErrInvalidEvaluatorOutput)
+		}
+	}
+	if output.ReportDisposition == "READY_FOR_HUMAN_DECISION" && !output.HumanReview.Required {
+		return nil, fmt.Errorf("%w: human decision disposition requires human review", ErrInvalidEvaluatorOutput)
 	}
 	return &output, nil
 }

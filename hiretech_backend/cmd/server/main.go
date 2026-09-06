@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
@@ -21,6 +22,7 @@ import (
 	apimgmtHandler "github.com/masterfabric-go/masterfabric/internal/infrastructure/http/handler/apimanagement"
 	auditHandler "github.com/masterfabric-go/masterfabric/internal/infrastructure/http/handler/audit"
 	iamHandler "github.com/masterfabric-go/masterfabric/internal/infrastructure/http/handler/iam"
+	privacyHandler "github.com/masterfabric-go/masterfabric/internal/infrastructure/http/handler/privacy"
 	realtimeHandler "github.com/masterfabric-go/masterfabric/internal/infrastructure/http/handler/realtime"
 	tenantHandler "github.com/masterfabric-go/masterfabric/internal/infrastructure/http/handler/tenant"
 	"github.com/masterfabric-go/masterfabric/internal/infrastructure/http/router"
@@ -31,6 +33,7 @@ import (
 	pgEvaluation "github.com/masterfabric-go/masterfabric/internal/infrastructure/postgres/evaluation"
 	pgIam "github.com/masterfabric-go/masterfabric/internal/infrastructure/postgres/iam"
 	pgInterview "github.com/masterfabric-go/masterfabric/internal/infrastructure/postgres/interview"
+	pgPrivacy "github.com/masterfabric-go/masterfabric/internal/infrastructure/postgres/privacy"
 	pgTenant "github.com/masterfabric-go/masterfabric/internal/infrastructure/postgres/tenant"
 	infraWS "github.com/masterfabric-go/masterfabric/internal/infrastructure/websocket"
 
@@ -42,12 +45,14 @@ import (
 	evaluationUC "github.com/masterfabric-go/masterfabric/internal/application/evaluation/usecase"
 	iamUC "github.com/masterfabric-go/masterfabric/internal/application/iam/usecase"
 	interviewUC "github.com/masterfabric-go/masterfabric/internal/application/interview/usecase"
+	privacyUC "github.com/masterfabric-go/masterfabric/internal/application/privacy/usecase"
 	realtimeUC "github.com/masterfabric-go/masterfabric/internal/application/realtime/usecase"
 	tenantUC "github.com/masterfabric-go/masterfabric/internal/application/tenant/usecase"
 
 	// AI gateway
 	aiService "github.com/masterfabric-go/masterfabric/internal/domain/ai/service"
 	aiadminModel "github.com/masterfabric-go/masterfabric/internal/domain/aiadmin/model"
+	auditRepository "github.com/masterfabric-go/masterfabric/internal/domain/audit/repository"
 
 	// Gateway
 	"github.com/masterfabric-go/masterfabric/internal/gateway"
@@ -151,6 +156,33 @@ func run() error {
 			MaxBatchesPerCycle: cfg.Audit.RelayMaxBatchesPerCycle,
 		})
 		go relay.Run(serviceCtx)
+	}
+	if cfg.Audit.IntegrityCheckEnabled {
+		integrityRepo, ok := deps.AuditRepo.(auditRepository.IntegrityRepository)
+		if !ok || deps.OrgRepo == nil {
+			if cfg.IsProduction() {
+				return fmt.Errorf("audit integrity monitor requires integrity and organization repositories in production")
+			}
+			log.Warn("audit integrity monitor is not configured")
+		} else {
+			monitor := auditUC.NewIntegrityMonitorWithConfig(integrityRepo, auditUC.NewSlogIntegrityAlertSink(log), auditUC.IntegrityMonitorConfig{
+				Interval: cfg.Audit.IntegrityCheckInterval, OrganizationPageSize: cfg.Audit.IntegrityPageSize, MaxOrganizations: cfg.Audit.IntegrityMaxOrganizations,
+			})
+			listOrganizations := func(ctx context.Context, offset, limit int) ([]uuid.UUID, int, error) {
+				organizations, total, err := deps.OrgRepo.List(ctx, offset, limit)
+				if err != nil {
+					return nil, 0, err
+				}
+				ids := make([]uuid.UUID, 0, len(organizations))
+				for _, organization := range organizations {
+					if organization != nil && organization.ID != uuid.Nil {
+						ids = append(ids, organization.ID)
+					}
+				}
+				return ids, total, nil
+			}
+			go monitor.Run(serviceCtx, listOrganizations, log)
+		}
 	}
 
 	// Build router
@@ -268,6 +300,7 @@ func buildDependencies(
 	interviewRepo := pgInterview.NewRepository(db)
 	evaluationRepo := pgEvaluation.NewRepository(db)
 	aiadminRepo := pgAIAdmin.NewRepository(db)
+	privacyRepo := pgPrivacy.NewRepository(db)
 
 	// --- Services ---
 	jwtService := infraAuth.NewJWTService(cfg.JWT)
@@ -372,7 +405,8 @@ func buildDependencies(
 	)
 	deps.APIMgmtHandler = apimgmtHandler.NewHandler(defineEndpointUC, updatePolicyUC, retireEndpointUC, activateEndpointUC, endpointRepo, policyRepo)
 	deps.AuditHandler = auditHandler.NewHandler(auditRepo)
-	subscriptionBroker := infraWS.NewSubscriptionBroker(log, cfg.WebSocket.MaxConnections)
+	deps.PrivacyHandler = privacyHandler.NewHandler(privacyUC.NewService(privacyRepo))
+	subscriptionBroker := infraWS.NewSubscriptionBroker(log, cfg.WebSocket.MaxConnections, redisClient, cfg.JWT.Secret)
 	subscriptionBroker.Register(eventBus)
 	defer subscriptionBroker.Close()
 	graphqlHandler := graphqlInfra.NewHandler(graphqlInfra.Dependencies{

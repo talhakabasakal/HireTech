@@ -34,13 +34,11 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   // `npm run build:web` runs the repository's explicit typecheck first. Keep
-  // Next's duplicate build-time check disabled for this project. The API path
-  // avoids the Next 16.3 CLI --showConfig parser incompatibility with TS 5.9.
+  // Next's build-time validation enabled as a second release safety net. The
+  // API path avoids the Next 16.3 CLI --showConfig parser incompatibility with
+  // TS 5.9.
   experimental: {
     useTypeScriptCli: false,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
   },
   async headers() {
     return [{

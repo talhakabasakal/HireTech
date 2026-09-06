@@ -3,11 +3,13 @@ package audit
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	auditDomain "github.com/masterfabric-go/masterfabric/internal/domain/audit"
 	"github.com/masterfabric-go/masterfabric/internal/domain/audit/model"
 	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
 	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
@@ -28,16 +30,88 @@ func (r *AuditRepo) Create(ctx context.Context, log *model.AuditLog) error {
 		log.ID = uuid.New()
 	}
 	log.CreatedAt = time.Now().UTC()
-
-	_, err := r.db.Exec(ctx,
-		`INSERT INTO audit_logs (id, organization_id, app_id, endpoint_id, user_id, request_id, action, resource_type, resource_id, metadata, ip_address, user_agent, created_at)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+	if log.RetentionUntil.IsZero() {
+		log.RetentionUntil = log.CreatedAt.AddDate(2, 0, 0)
+	}
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return domainErr.New(domainErr.ErrInternal, "failed to begin audit write", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, log.OrganizationID.String()); err != nil {
+		return domainErr.New(domainErr.ErrInternal, "failed to lock audit chain", err)
+	}
+	if err = tx.QueryRow(ctx, `SELECT COALESCE((SELECT entry_hash FROM audit_logs WHERE organization_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1), '')`, log.OrganizationID).Scan(&log.PreviousHash); err != nil {
+		return domainErr.New(domainErr.ErrInternal, "failed to read audit chain head", err)
+	}
+	log.EntryHash, err = auditDomain.EntryHash(*log)
+	if err != nil {
+		return domainErr.New(domainErr.ErrInternal, "failed to hash audit entry", err)
+	}
+	_, err = tx.Exec(ctx,
+		`INSERT INTO audit_logs (id, organization_id, app_id, endpoint_id, user_id, request_id, action, resource_type, resource_id, metadata, ip_address, user_agent, created_at, previous_hash, entry_hash, retention_until, legal_hold)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
 		log.ID, log.OrganizationID, log.AppID, log.EndpointID, log.UserID,
 		log.RequestID, log.Action, log.ResourceType, log.ResourceID,
-		log.Metadata, log.IPAddress, log.UserAgent, log.CreatedAt,
+		log.Metadata, log.IPAddress, log.UserAgent, log.CreatedAt, log.PreviousHash, log.EntryHash, log.RetentionUntil, log.LegalHold,
 	)
 	if err != nil {
 		return domainErr.New(domainErr.ErrInternal, "failed to create audit log", err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return domainErr.New(domainErr.ErrInternal, "failed to commit audit write", err)
+	}
+	return nil
+}
+
+func (r *AuditRepo) VerifyIntegrity(ctx context.Context, organizationID uuid.UUID) error {
+	rows, err := r.db.Query(ctx, `SELECT id, organization_id, request_id, action, resource_type, resource_id, metadata, created_at, previous_hash, entry_hash
+		FROM audit_logs WHERE organization_id=$1 ORDER BY created_at ASC,id ASC`, organizationID)
+	if err != nil {
+		return domainErr.New(domainErr.ErrInternal, "failed to read audit integrity chain", err)
+	}
+	defer rows.Close()
+	previous := ""
+	for rows.Next() {
+		var log model.AuditLog
+		if err := rows.Scan(&log.ID, &log.OrganizationID, &log.RequestID, &log.Action, &log.ResourceType, &log.ResourceID, &log.Metadata, &log.CreatedAt, &log.PreviousHash, &log.EntryHash); err != nil {
+			return domainErr.New(domainErr.ErrInternal, "failed to scan audit integrity chain", err)
+		}
+		if log.PreviousHash != previous || log.EntryHash == "" {
+			return fmt.Errorf("audit integrity chain mismatch at %s", log.ID)
+		}
+		expected, err := auditDomain.EntryHash(log)
+		if err != nil || expected != log.EntryHash {
+			return fmt.Errorf("audit entry hash mismatch at %s", log.ID)
+		}
+		previous = log.EntryHash
+	}
+	if err := rows.Err(); err != nil {
+		return domainErr.New(domainErr.ErrInternal, "failed to iterate audit integrity chain", err)
+	}
+	return nil
+}
+
+func (r *AuditRepo) PurgeExpired(ctx context.Context, now time.Time, limit int) (int, error) {
+	if limit <= 0 {
+		return 0, nil
+	}
+	result, err := r.db.Exec(ctx, `WITH doomed AS (
+		SELECT id FROM audit_logs WHERE retention_until < $1 AND legal_hold = FALSE ORDER BY retention_until,id LIMIT $2
+	) DELETE FROM audit_logs WHERE id IN (SELECT id FROM doomed)`, now.UTC(), limit)
+	if err != nil {
+		return 0, domainErr.New(domainErr.ErrInternal, "failed to purge expired audit logs", err)
+	}
+	return int(result.RowsAffected()), nil
+}
+
+func (r *AuditRepo) SetLegalHold(ctx context.Context, resourceType, resourceID string, held bool) error {
+	result, err := r.db.Exec(ctx, `UPDATE audit_logs SET legal_hold=$3 WHERE resource_type=$1 AND resource_id=$2`, resourceType, resourceID, held)
+	if err != nil {
+		return domainErr.New(domainErr.ErrInternal, "failed to update audit legal hold", err)
+	}
+	if result.RowsAffected() == 0 {
+		return domainErr.New(domainErr.ErrNotFound, "audit resource not found", nil)
 	}
 	return nil
 }
@@ -96,11 +170,28 @@ func (r *AuditRepo) RelayPending(ctx context.Context, limit int) (count int, err
 
 	for _, event := range pending {
 		userID, requestID := auditActorAndRequest(event.payload)
+		projectedAt := time.Now().UTC()
+		projected := model.AuditLog{
+			ID: event.id, OrganizationID: event.organizationID, UserID: userID,
+			RequestID: requestID, Action: event.action, ResourceType: event.resourceType,
+			ResourceID: event.resourceID.String(), Metadata: event.payload, CreatedAt: projectedAt,
+			RetentionUntil: projectedAt.AddDate(2, 0, 0),
+		}
+		if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, event.organizationID.String()); err != nil {
+			return 0, domainErr.New(domainErr.ErrInternal, "failed to lock projected audit chain", err)
+		}
+		if err = tx.QueryRow(ctx, `SELECT COALESCE((SELECT entry_hash FROM audit_logs WHERE organization_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1), '')`, event.organizationID).Scan(&projected.PreviousHash); err != nil {
+			return 0, domainErr.New(domainErr.ErrInternal, "failed to read projected audit chain head", err)
+		}
+		projected.EntryHash, err = auditDomain.EntryHash(projected)
+		if err != nil {
+			return 0, domainErr.New(domainErr.ErrInternal, "failed to hash projected audit entry", err)
+		}
 		_, err = tx.Exec(ctx, `
-			INSERT INTO audit_logs (id, organization_id, user_id, request_id, action, resource_type, resource_id, metadata, created_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+			INSERT INTO audit_logs (id, organization_id, user_id, request_id, action, resource_type, resource_id, metadata, created_at, previous_hash, entry_hash, retention_until, legal_hold)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 			ON CONFLICT (id) DO NOTHING`,
-			event.id, event.organizationID, userID, requestID, event.action, event.resourceType, event.resourceID.String(), event.payload, event.occurredAt,
+			projected.ID, projected.OrganizationID, projected.UserID, projected.RequestID, projected.Action, projected.ResourceType, projected.ResourceID, projected.Metadata, projected.CreatedAt, projected.PreviousHash, projected.EntryHash, projected.RetentionUntil, projected.LegalHold,
 		)
 		if err != nil {
 			return 0, domainErr.New(domainErr.ErrInternal, "failed to project audit event", err)

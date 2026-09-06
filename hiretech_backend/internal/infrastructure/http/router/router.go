@@ -18,6 +18,7 @@ import (
 	auditHandler "github.com/masterfabric-go/masterfabric/internal/infrastructure/http/handler/audit"
 	"github.com/masterfabric-go/masterfabric/internal/infrastructure/http/handler/health"
 	iamHandler "github.com/masterfabric-go/masterfabric/internal/infrastructure/http/handler/iam"
+	privacyHandler "github.com/masterfabric-go/masterfabric/internal/infrastructure/http/handler/privacy"
 	realtimeHandler "github.com/masterfabric-go/masterfabric/internal/infrastructure/http/handler/realtime"
 	tenantHandler "github.com/masterfabric-go/masterfabric/internal/infrastructure/http/handler/tenant"
 
@@ -62,6 +63,7 @@ type Dependencies struct {
 	TenantHandler           *tenantHandler.Handler
 	APIMgmtHandler          *apimgmtHandler.Handler
 	AuditHandler            *auditHandler.Handler
+	PrivacyHandler          *privacyHandler.Handler
 	RealtimeHandler         *realtimeHandler.Handler
 	GraphQLHandler          http.Handler
 	GraphQLWebsocketHandler http.Handler
@@ -155,6 +157,11 @@ func New(deps Dependencies) *chi.Mux {
 			// User routes
 			if deps.IAMHandler != nil {
 				r.Get("/me", deps.IAMHandler.GetMe)
+				if deps.PrivacyHandler != nil {
+					r.Post("/me/privacy/export", deps.PrivacyHandler.RequestExport)
+					r.Post("/me/privacy/deletion", deps.PrivacyHandler.RequestDeletion)
+					r.Get("/me/privacy/{requestId}", deps.PrivacyHandler.GetRequest)
+				}
 				r.With(maybeRequirePermission(deps.RBACService, "user:read")).Route("/users", func(r chi.Router) {
 					r.Get("/", deps.IAMHandler.ListUsers)
 					r.Get("/{id}", deps.IAMHandler.GetUser)
@@ -169,6 +176,10 @@ func New(deps Dependencies) *chi.Mux {
 					r.With(maybeRequirePermission(deps.RBACService, "org:read")).Get("/", deps.TenantHandler.ListOrgs)
 					r.Route("/{orgId}", func(r chi.Router) {
 						r.Use(middleware.RequireOrganizationPath)
+						if deps.PrivacyHandler != nil {
+							r.With(maybeRequirePermission(deps.RBACService, "org:write")).Post("/legal-holds", deps.PrivacyHandler.CreateLegalHold)
+							r.With(maybeRequirePermission(deps.RBACService, "org:write")).Delete("/legal-holds/{holdId}", deps.PrivacyHandler.ReleaseLegalHold)
+						}
 						r.With(maybeRequirePermission(deps.RBACService, "org:read")).Get("/", deps.TenantHandler.GetOrg)
 
 						// Apps under organization

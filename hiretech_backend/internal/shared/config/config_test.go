@@ -80,6 +80,7 @@ func TestConfig_ValidateForProductionRejectsShortJWTSecret(t *testing.T) {
 
 func TestConfig_ValidateForProductionAcceptsConfiguredJWTSecret(t *testing.T) {
 	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{
+		Secret:        "a-secure-application-hmac-secret-with-32-chars",
 		Algorithm:     "RS256",
 		PrivateKeyPEM: "configured",
 		PublicKeys:    map[string]string{"active": "configured"},
@@ -100,6 +101,7 @@ func TestConfig_ValidateForProductionRejectsHS256(t *testing.T) {
 
 func TestConfig_ValidateForProductionRequiresPersistedOperationHashesWhenEnabled(t *testing.T) {
 	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{
+		Secret:        "a-secure-application-hmac-secret-with-32-chars",
 		Algorithm:     "RS256",
 		PrivateKeyPEM: "configured",
 		PublicKeys:    map[string]string{"active": "configured"},
@@ -111,6 +113,7 @@ func TestConfig_ValidateForProductionRequiresPersistedOperationHashesWhenEnabled
 
 func TestConfig_ValidateForProductionRejectsInvalidAuditRelayBounds(t *testing.T) {
 	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{
+		Secret:        "a-secure-application-hmac-secret-with-32-chars",
 		Algorithm:     "RS256",
 		PrivateKeyPEM: "configured",
 		PublicKeys:    map[string]string{"active": "configured"},
@@ -122,6 +125,7 @@ func TestConfig_ValidateForProductionRejectsInvalidAuditRelayBounds(t *testing.T
 
 func TestAIConfig_ValidateForProductionRejectsSmoketestModel(t *testing.T) {
 	cfg := &Config{Environment: EnvironmentProduction, JWT: JWTConfig{
+		Secret:        "a-secure-application-hmac-secret-with-32-chars",
 		Algorithm:     "RS256",
 		PrivateKeyPEM: "configured",
 		PublicKeys:    map[string]string{"active": "configured"},

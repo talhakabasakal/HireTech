@@ -1,4 +1,4 @@
-.PHONY: build run test test-integration test-integration-postgres test-integration-redis test-integration-kafka test-ai-benchmark-validate lint migrate migrate-down docker-up docker-down clean help
+.PHONY: build run test test-integration test-integration-postgres test-integration-redis test-integration-kafka test-ai-benchmark-validate production-readiness lint migrate migrate-down docker-up docker-down clean help
 
 APP_NAME := masterfabric
 BUILD_DIR := bin
@@ -50,6 +50,11 @@ test-integration-kafka:
 test-ai-benchmark-validate:
 	python3 ai/benchmarks/run_benchmark.py --role interviewer --dataset ai/training/data/curated/interviewer/test.jsonl --validate-only
 	python3 ai/benchmarks/run_benchmark.py --role evaluator --dataset ai/training/data/curated/evaluator/test.jsonl --validate-only
+
+## production-readiness: Assemble fail-closed evidence; does not deploy
+production-readiness:
+	@test -n "$(RELEASE_EVIDENCE)" || (echo "RELEASE_EVIDENCE is required; refusing to infer approvals" >&2; exit 1)
+	python3 scripts/production_readiness.py --evidence "$(RELEASE_EVIDENCE)"
 
 ## test-cover: Run tests with coverage
 test-cover:

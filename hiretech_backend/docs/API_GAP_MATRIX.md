@@ -28,7 +28,7 @@ Status values:
 | Capability | Current state | Target state | Status | Planned increment |
 | --- | --- | --- | --- | --- |
 | GraphQL HTTP endpoint | POST-only `/graphql` route, schema, generated transport, and resolvers | `POST /graphql` in the existing Go process | Implemented; protect with tests | 0 onward |
-| GraphQL subscriptions | `/graphql` WebSocket upgrade with `graphql-transport-ws`, `interviewUpdated`, JWT/session/origin checks, and event-bus broker | Reconnectable, cross-instance subscription transport with reviewed operation manifest | Partial; lifecycle stream implemented | 3 |
+| GraphQL subscriptions | `/graphql` WebSocket upgrade with `graphql-transport-ws`, `interviewUpdated`, JWT/session/origin checks, tenant/interview-scoped bounded replay cursor, and event-bus broker | Reconnectable, cross-instance subscription transport with reviewed operation manifest | Partial; bounded Redis-backed replay is implemented; broader subscription coverage and operational review remain | 3 |
 | REST compatibility | `/api/v1/**` routes are active | Remain unchanged while sharing use cases with GraphQL | Implemented; protect with tests | 0 onward |
 | Existing WebSocket compatibility | Organization/app domain-event stream exists | Remain available; do not overload it with candidate chat semantics | Implemented; protect with tests | 0 onward |
 | GraphQL schema lifecycle | Source-controlled schema and generated gqlgen transport/model code | Schema-first source, generated code, linting, registry, breaking-change gate | Partial | 0–1 |
@@ -37,7 +37,7 @@ Status values:
 | GraphQL request limits | Body, operation, depth, node, alias, fragment, complexity, introspection, and timeout limits | Same controls with regression coverage | Implemented; protect with tests | 0 onward |
 | Resolver batching | None | Request-scoped, tenant-keyed DataLoaders | Missing | 1 |
 | Persisted operations | Optional fail-closed SHA-256 gate, frontend hash emission, deterministic reviewed manifest, drift check, and deployment-safe env rendering are implemented | Coordinated production activation after release approval | Implemented; rollout pending | Review the generated manifest and enable both release flags together |
-| Frontend API client | Hand-written typed adapters and GraphQL documents behind a dependency-composed API mode; API-mode OTP E2E gate added | Generated typed GraphQL client behind a frontend adapter and full backend-connected lifecycle E2E | Partial | Run the API-mode gate in a reachable backend/Mailpit environment; expand to interview lifecycle |
+| Frontend API client | Hand-written typed adapters and GraphQL documents behind a dependency-composed API mode; API-mode auth and synthetic interview lifecycle E2E gates pass against real local services | Generated typed GraphQL client behind a frontend adapter and broader backend-connected coverage | Partial; core auth-to-completion path verified, remaining recruiter/admin/error-surface coverage is pending | Expand the bounded gate to remaining release-critical surfaces |
 
 ## 3. Authentication and tenant gaps
 
@@ -74,7 +74,7 @@ The mappings below show which existing use cases may be reused. They do not auth
 | API-key routes | No frontend operation | Preserve through restricted REST/admin tooling | Do not expose provider/API credentials through product GraphQL |
 | Managed endpoint routes | No frontend operation | Preserve as platform administration REST | Do not use dynamic endpoints as an interview data model |
 | Audit list routes | `adminAuditEvents` GraphQL connection plus existing REST list routes | Transactional outbox writes, horizontally safe configurable backlog draining, relay metrics, and tenant-scoped projection exist | Add retention/integrity controls, deploy alert routing, and strengthen permission tests |
-| `/api/v1/ws` | Generic organization/app event stream remains compatible | Keep existing stream; GraphQL interview stream is separate | GraphQL subscription authorization and lifecycle events implemented; reconnect cursor remains |
+| `/api/v1/ws` | Generic organization/app event stream remains compatible | Keep existing stream; GraphQL interview stream is separate | GraphQL subscription authorization, lifecycle events, and bounded reconnect replay are implemented; Redis availability and replay-gap refetch handling remain |
 
 ## 5. Product-domain gap matrix
 
@@ -87,7 +87,7 @@ The mappings below show which existing use cases may be reused. They do not auth
 | Interviews | Interview aggregate, lifecycle, invitation, consent, candidate scope, keyset-paginated connection | Interview aggregate, lifecycle, invitation, consent, candidate scope | `interviews`, `interviewConnection`, `interview`, create/publish/start/complete | Tenant identity, audit |
 | Questions | None | Types, competencies, ordering, difficulty, immutable publication | `question`, `addQuestion`, interview connection | Interview lifecycle, rubric |
 | Answers | Immutable text/code versions, idempotency, content hashes | Evidence links and execution lifecycle | `answer`, `submitAnswer` | Candidate token, object storage, sandbox later |
-| Realtime interview | Candidate-safe `interviewUpdated` lifecycle stream, tenant/interview keyed broker, JWT scope checks | Durable reconnect cursor and cross-instance fan-out | `interviewUpdated` | Event bus, subscription transport, replay store |
+| Realtime interview | Candidate-safe `interviewUpdated` lifecycle stream, tenant/interview keyed broker, JWT scope checks, and bounded Redis Stream replay with scoped cursors | Durable reconnect cursor and cross-instance fan-out | `interviewUpdated` | Event bus, subscription transport, Redis retention/operations |
 | Code execution | Fail-closed external sandbox adapter contract with request/result bounds and provenance requirement; not enabled by default | Isolated runner, resource limits, language images, cryptographic result verification and evidence persistence | `TestEvidence` initially read-only | Separate sandbox service, trusted key ring, artifact store, security review |
 | Evaluation | Evaluation job/report persistence and deterministic baseline | Provider-backed scoring, richer rubric administration, benchmark lifecycle | `evaluationReport`, `requestEvaluation` | AI contracts, interview evidence |
 | Human review | Review record, requester separation, publication gate | Queue/assignment UI and operational workflows | `recordHumanReview` and report fields | Evaluation, admin RBAC, audit |
@@ -146,10 +146,10 @@ The mappings below show which existing use cases may be reused. They do not auth
 Verified PostgreSQL lifecycle and Redis rate-limit integration gate
   -> audit relay alerting/retention and complete admin audit lifecycle
   -> real interviewer/evaluator model artifacts and quality/latency evidence
-  -> durable subscription replay/cursor (live cross-instance Kafka fan-out is implemented)
+  -> subscription replay retention/alerting and broader realtime stream coverage (bounded interview replay cursor and live cross-instance Kafka fan-out are implemented)
   -> owner-authorized sandbox deployment, key-ring verification, and isolated interoperability test
   -> deletion, retention, export, and legal-hold verification
-  -> frontend E2E and authorized release packaging
+  -> broader frontend E2E and authorized release packaging
 ```
 
 Code execution remains a separately reviewed sandbox track. Fine-tuning is

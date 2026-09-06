@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -37,6 +38,36 @@ func TestClientRejectsUnsafeRemoteEndpoint(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestClientRejectsRedirectedRunnerResponse(t *testing.T) {
+	redirected := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/executions" {
+			http.Redirect(w, r, "/redirected", http.StatusFound)
+			return
+		}
+		redirected = true
+	}))
+	defer server.Close()
+
+	client, err := NewClient(nil, server.URL, "")
+	require.NoError(t, err)
+	_, err = client.Execute(context.Background(), validRequest())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "HTTP 302")
+	require.False(t, redirected)
+}
+
+func TestClientRejectsOversizedRunnerResponse(t *testing.T) {
+	transport := roundTripFunc(func(*http.Request) (*http.Response, error) {
+		body := strings.Repeat("x", int(executionModel.MaxOutputBytes+64*1024+1))
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
+	})
+	client, err := NewClient(&http.Client{Transport: transport}, "http://127.0.0.1:9090", "")
+	require.NoError(t, err)
+	_, err = client.Execute(context.Background(), validRequest())
+	require.EqualError(t, err, "sandbox response is too large")
+}
+
 func TestClientExecutesOnlyThroughBoundedSignedSandboxResponse(t *testing.T) {
 	result := validResult()
 	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
@@ -66,6 +97,20 @@ func TestClientFailsClosedOnMissingResultProvenance(t *testing.T) {
 	_, err = client.Execute(context.Background(), validRequest())
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "provenance"))
+}
+
+func TestClientFailsClosedOnMissingResultDigest(t *testing.T) {
+	result := validResult()
+	result.ResultDigest = ""
+	transport := roundTripFunc(func(*http.Request) (*http.Response, error) {
+		body, err := json.Marshal(result)
+		require.NoError(t, err)
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(string(body))), Header: make(http.Header)}, nil
+	})
+	client, err := NewClient(&http.Client{Transport: transport}, "http://127.0.0.1:9090", "")
+	require.NoError(t, err)
+	_, err = client.Execute(context.Background(), validRequest())
+	require.EqualError(t, err, "sandbox result provenance is incomplete")
 }
 
 func TestRequestValidationRejectsOversizedOrUnboundedExecution(t *testing.T) {

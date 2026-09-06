@@ -56,7 +56,7 @@ test("authenticates through the real backend and Mailpit OTP", async ({ page, re
   await expect(page).toHaveURL(/\/candidate$/);
 
   expect(observed.get("/api/v1/auth/login")).toBe(200);
-  expect(observed.get("/api/v1/auth/otp/request")).toBe(200);
+  expect([200, 202]).toContain(observed.get("/api/v1/auth/otp/request"));
   expect(observed.get("/api/v1/auth/otp/verify")).toBe(200);
   expect(observed.get("/api/v1/me")).toBe(200);
   await expect(page.getByText("Demo mode — isolated UI data only.")).toHaveCount(0);

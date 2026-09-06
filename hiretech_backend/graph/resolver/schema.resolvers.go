@@ -6,6 +6,7 @@ package resolver
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -15,26 +16,62 @@ import (
 	interviewUsecase "github.com/masterfabric-go/masterfabric/internal/application/interview/usecase"
 	aiadminModel "github.com/masterfabric-go/masterfabric/internal/domain/aiadmin/model"
 	interviewModel "github.com/masterfabric-go/masterfabric/internal/domain/interview/model"
+	infraWS "github.com/masterfabric-go/masterfabric/internal/infrastructure/websocket"
 	"github.com/masterfabric-go/masterfabric/internal/shared/authcontext"
 	domainErr "github.com/masterfabric-go/masterfabric/internal/shared/errors"
 	"github.com/masterfabric-go/masterfabric/internal/shared/pagination"
-	"github.com/masterfabric-go/masterfabric/internal/shared/permissions"
 )
 
 // Questions is the resolver for the questions field.
 func (r *interviewResolver) Questions(ctx context.Context, obj *model.Interview) ([]*model.Question, error) {
-	if obj == nil || obj.Questions == nil {
+	if obj == nil {
 		return []*model.Question{}, nil
 	}
-	return obj.Questions, nil
+	if len(obj.Questions) > 0 {
+		return obj.Questions, nil
+	}
+	actor, err := requireActor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if r.InterviewUseCase == nil {
+		return nil, notConfigured("interview questions")
+	}
+	values, err := r.InterviewUseCase.ListQuestions(ctx, actor, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*model.Question, 0, len(values))
+	for _, value := range values {
+		result = append(result, questionGraphQL(value))
+	}
+	return result, nil
 }
 
 // Answers is the resolver for the answers field.
 func (r *interviewResolver) Answers(ctx context.Context, obj *model.Interview) ([]*model.Answer, error) {
-	if obj == nil || obj.Answers == nil {
+	if obj == nil {
 		return []*model.Answer{}, nil
 	}
-	return obj.Answers, nil
+	if len(obj.Answers) > 0 {
+		return obj.Answers, nil
+	}
+	actor, err := requireActor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if r.InterviewUseCase == nil {
+		return nil, notConfigured("interview answers")
+	}
+	values, err := r.InterviewUseCase.ListAnswers(ctx, actor, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*model.Answer, 0, len(values))
+	for _, value := range values {
+		result = append(result, answerGraphQL(value))
+	}
+	return result, nil
 }
 
 // SelectOrganization is the resolver for the selectOrganization field.
@@ -580,7 +617,7 @@ func (r *queryResolver) AdminAuditEvents(ctx context.Context, first *int, after 
 }
 
 // InterviewUpdated is the resolver for the interviewUpdated field.
-func (r *subscriptionResolver) InterviewUpdated(ctx context.Context, interviewID uuid.UUID) (<-chan *model.InterviewUpdated, error) {
+func (r *subscriptionResolver) InterviewUpdated(ctx context.Context, interviewID uuid.UUID, after *string) (<-chan *model.InterviewUpdated, error) {
 	actor, err := requireActor(ctx)
 	if err != nil {
 		return nil, err
@@ -603,27 +640,33 @@ func (r *subscriptionResolver) InterviewUpdated(ctx context.Context, interviewID
 	if r.SubscriptionBroker == nil {
 		return nil, notConfigured("interview subscriptions")
 	}
-	updates, err := r.SubscriptionBroker.Subscribe(ctx, actor.OrganizationID, interviewID)
+	afterCursor := ""
+	if after != nil {
+		afterCursor = *after
+	}
+	updates, err := r.SubscriptionBroker.Subscribe(ctx, actor.OrganizationID, interviewID, afterCursor)
 	if err != nil {
-		return nil, domainErr.New(domainErr.ErrRateLimited, "interview subscription unavailable", err)
+		switch {
+		case errors.Is(err, infraWS.ErrReplayCursorInvalid):
+			return nil, domainErr.New(domainErr.ErrValidation, "interview subscription cursor is invalid", err)
+		case errors.Is(err, infraWS.ErrReplayCursorExpired):
+			return nil, domainErr.New(domainErr.ErrConflict, "interview subscription cursor has expired; refetch interview state", err)
+		case errors.Is(err, infraWS.ErrReplayGap):
+			return nil, domainErr.New(domainErr.ErrConflict, "interview subscription cursor has a replay gap; refetch interview state", err)
+		case errors.Is(err, infraWS.ErrReplayLimit):
+			return nil, domainErr.New(domainErr.ErrConflict, "interview subscription replay is too large; refetch interview state", err)
+		default:
+			return nil, domainErr.New(domainErr.ErrInternal, "interview subscription unavailable", err)
+		}
 	}
 	stream := make(chan *model.InterviewUpdated, 16)
 	go func() {
 		defer close(stream)
 		for update := range updates {
-			stream <- &model.InterviewUpdated{InterviewID: update.InterviewID, EventType: update.EventType, Status: update.Status, Version: update.Version, OccurredAt: update.OccurredAt}
+			stream <- &model.InterviewUpdated{InterviewID: update.InterviewID, Cursor: update.Cursor, EventType: update.EventType, Status: update.Status, Version: update.Version, OccurredAt: update.OccurredAt}
 		}
 	}()
 	return stream, nil
-}
-
-func hasPermission(granted []string, required string) bool {
-	for _, value := range granted {
-		if permissions.Matches(value, required) {
-			return true
-		}
-	}
-	return false
 }
 
 // Interview returns generated.InterviewResolver implementation.

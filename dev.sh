@@ -17,6 +17,16 @@ PIDS=()
 BACKEND_CONTAINER_NAME="hiretech-backend-dev"
 BACKEND_IMAGE="hiretech-backend-dev:local"
 
+# Optional local-only deployment secrets/configuration. The file is ignored by
+# git and is never copied into the frontend or Docker image.
+LOCAL_ENV_FILE="${HIRETECH_ENV_FILE:-$PROJECT_ROOT/.env.local}"
+if [[ -f "$LOCAL_ENV_FILE" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$LOCAL_ENV_FILE"
+    set +a
+fi
+
 # Mail delivery. Local development uses the bundled Mailpit inbox; when a
 # real provider is supplied, forward it into the backend container unchanged.
 if [[ -n "${HIRETECH_SMTP_HOST:-}" ]]; then

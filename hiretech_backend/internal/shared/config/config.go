@@ -46,13 +46,13 @@ func (c *Config) ValidateForProduction() error {
 	if !c.IsProduction() {
 		return nil
 	}
+	if c.JWT.Secret == defaultJWTSecret {
+		return fmt.Errorf("JWT_SECRET must be explicitly configured in production")
+	}
+	if len(strings.TrimSpace(c.JWT.Secret)) < 32 {
+		return fmt.Errorf("JWT_SECRET must contain at least 32 characters in production")
+	}
 	if !strings.EqualFold(strings.TrimSpace(c.JWT.Algorithm), "RS256") {
-		if c.JWT.Secret == defaultJWTSecret {
-			return fmt.Errorf("JWT_SECRET must be explicitly configured in production")
-		}
-		if len(strings.TrimSpace(c.JWT.Secret)) < 32 {
-			return fmt.Errorf("JWT_SECRET must contain at least 32 characters in production")
-		}
 		return fmt.Errorf("JWT_ALGORITHM must be RS256 in production")
 	}
 	if strings.TrimSpace(c.JWT.PrivateKeyPEM) == "" {
@@ -80,6 +80,11 @@ func (c *Config) ValidateForProduction() error {
 	if c.Audit.RelayEnabled {
 		if c.Audit.RelayBatchSize <= 0 || c.Audit.RelayInterval <= 0 || c.Audit.RelayMaxBatchesPerCycle <= 0 {
 			return fmt.Errorf("audit relay batch size, interval, and max batches per cycle must be positive in production")
+		}
+	}
+	if c.Audit.IntegrityCheckEnabled {
+		if c.Audit.IntegrityCheckInterval <= 0 || c.Audit.IntegrityPageSize <= 0 || c.Audit.IntegrityMaxOrganizations <= 0 {
+			return fmt.Errorf("audit integrity interval, page size, and organization limit must be positive in production")
 		}
 	}
 	return nil
@@ -114,10 +119,14 @@ type GraphQLConfig struct {
 
 // AuditConfig controls the bounded transactional outbox relay.
 type AuditConfig struct {
-	RelayEnabled            bool
-	RelayBatchSize          int
-	RelayInterval           time.Duration
-	RelayMaxBatchesPerCycle int
+	RelayEnabled              bool
+	RelayBatchSize            int
+	RelayInterval             time.Duration
+	RelayMaxBatchesPerCycle   int
+	IntegrityCheckEnabled     bool
+	IntegrityCheckInterval    time.Duration
+	IntegrityPageSize         int
+	IntegrityMaxOrganizations int
 }
 
 // ServerConfig holds HTTP server settings.
@@ -339,10 +348,14 @@ func Load() *Config {
 			AllowedOperationHashes:     parseHashList(os.Getenv("GRAPHQL_ALLOWED_OPERATION_HASHES")),
 		},
 		Audit: AuditConfig{
-			RelayEnabled:            envOrDefault("AUDIT_RELAY_ENABLED", "true") == "true",
-			RelayBatchSize:          envOrDefaultInt("AUDIT_RELAY_BATCH_SIZE", 100),
-			RelayInterval:           time.Duration(envOrDefaultInt("AUDIT_RELAY_INTERVAL_MILLISECONDS", 2000)) * time.Millisecond,
-			RelayMaxBatchesPerCycle: envOrDefaultInt("AUDIT_RELAY_MAX_BATCHES_PER_CYCLE", 10),
+			RelayEnabled:              envOrDefault("AUDIT_RELAY_ENABLED", "true") == "true",
+			RelayBatchSize:            envOrDefaultInt("AUDIT_RELAY_BATCH_SIZE", 100),
+			RelayInterval:             time.Duration(envOrDefaultInt("AUDIT_RELAY_INTERVAL_MILLISECONDS", 2000)) * time.Millisecond,
+			RelayMaxBatchesPerCycle:   envOrDefaultInt("AUDIT_RELAY_MAX_BATCHES_PER_CYCLE", 10),
+			IntegrityCheckEnabled:     envOrDefault("AUDIT_INTEGRITY_CHECK_ENABLED", "true") == "true",
+			IntegrityCheckInterval:    time.Duration(envOrDefaultInt("AUDIT_INTEGRITY_CHECK_INTERVAL_SECONDS", 300)) * time.Second,
+			IntegrityPageSize:         envOrDefaultInt("AUDIT_INTEGRITY_PAGE_SIZE", 100),
+			IntegrityMaxOrganizations: envOrDefaultInt("AUDIT_INTEGRITY_MAX_ORGANIZATIONS", 1000),
 		},
 		Log: LogConfig{
 			Level:  envOrDefault("LOG_LEVEL", "info"),

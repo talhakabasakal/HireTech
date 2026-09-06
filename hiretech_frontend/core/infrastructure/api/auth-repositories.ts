@@ -15,7 +15,7 @@ interface OrganizationSelection { selectOrganization: { accessToken: string; org
 
 function roleFromToken(token: string): UserRole {
   const claims = decodeSessionToken(token);
-  return roleFromClaims(claims?.roles, claims?.permissions);
+  return roleFromClaims(claims?.roles, claims?.permissions, claims?.tokenClass);
 }
 
 function provisionalSession(user: UserInfo, token: string): AuthSession {

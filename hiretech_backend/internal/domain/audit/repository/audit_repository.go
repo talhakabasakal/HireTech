@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/masterfabric-go/masterfabric/internal/domain/audit/model"
@@ -32,4 +33,17 @@ type OrganizationScopedUserAuditRepository interface {
 // contract used by cursor-based API connections.
 type CursorAuditRepository interface {
 	ListByOrgPage(ctx context.Context, orgID uuid.UUID, after *pagination.Cursor, limit int) ([]*model.AuditLog, error)
+}
+
+// IntegrityRepository verifies the per-organization hash chain. A production
+// monitor must treat any error as an alert and stop retention cleanup.
+type IntegrityRepository interface {
+	VerifyIntegrity(ctx context.Context, organizationID uuid.UUID) error
+}
+
+// RetentionRepository exposes bounded cleanup and legal-hold mutation. Holds
+// are evaluated in storage so cleanup cannot race with an application-only flag.
+type RetentionRepository interface {
+	PurgeExpired(ctx context.Context, now time.Time, limit int) (int, error)
+	SetLegalHold(ctx context.Context, resourceType, resourceID string, held bool) error
 }

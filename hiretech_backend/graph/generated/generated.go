@@ -244,6 +244,7 @@ type ComplexityRoot struct {
 	}
 
 	InterviewUpdated struct {
+		Cursor      func(childComplexity int) int
 		EventType   func(childComplexity int) int
 		InterviewID func(childComplexity int) int
 		OccurredAt  func(childComplexity int) int
@@ -346,7 +347,7 @@ type ComplexityRoot struct {
 	}
 
 	Subscription struct {
-		InterviewUpdated func(childComplexity int, interviewID uuid.UUID) int
+		InterviewUpdated func(childComplexity int, interviewID uuid.UUID, after *string) int
 	}
 
 	User struct {
@@ -401,7 +402,7 @@ type QueryResolver interface {
 	AdminAuditEvents(ctx context.Context, first *int, after *string) (*model.AdminAuditConnection, error)
 }
 type SubscriptionResolver interface {
-	InterviewUpdated(ctx context.Context, interviewID uuid.UUID) (<-chan *model.InterviewUpdated, error)
+	InterviewUpdated(ctx context.Context, interviewID uuid.UUID, after *string) (<-chan *model.InterviewUpdated, error)
 }
 
 type executableSchema struct {
@@ -1258,6 +1259,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.InterviewInvitationPayload.Token(childComplexity), true
 
+	case "InterviewUpdated.cursor":
+		if e.complexity.InterviewUpdated.Cursor == nil {
+			break
+		}
+
+		return e.complexity.InterviewUpdated.Cursor(childComplexity), true
 	case "InterviewUpdated.eventType":
 		if e.complexity.InterviewUpdated.EventType == nil {
 			break
@@ -1872,7 +1879,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Subscription.InterviewUpdated(childComplexity, args["interviewId"].(uuid.UUID)), true
+		return e.complexity.Subscription.InterviewUpdated(childComplexity, args["interviewId"].(uuid.UUID), args["after"].(*string)), true
 
 	case "User.createdAt":
 		if e.complexity.User.CreatedAt == nil {
@@ -2354,6 +2361,7 @@ type InterviewConnection {
 
 type InterviewUpdated {
   interviewId: UUID!
+  cursor: String!
   eventType: String!
   status: String!
   version: Int!
@@ -2560,7 +2568,7 @@ type Mutation {
 }
 
 type Subscription {
-  interviewUpdated(interviewId: UUID!): InterviewUpdated!
+  interviewUpdated(interviewId: UUID!, after: String): InterviewUpdated!
 }
 `, BuiltIn: false},
 }
@@ -2953,6 +2961,11 @@ func (ec *executionContext) field_Subscription_interviewUpdated_args(ctx context
 		return nil, err
 	}
 	args["interviewId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg1
 	return args, nil
 }
 
@@ -7307,6 +7320,35 @@ func (ec *executionContext) fieldContext_InterviewUpdated_interviewId(_ context.
 	return fc, nil
 }
 
+func (ec *executionContext) _InterviewUpdated_cursor(ctx context.Context, field graphql.CollectedField, obj *model.InterviewUpdated) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_InterviewUpdated_cursor,
+		func(ctx context.Context) (any, error) {
+			return obj.Cursor, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_InterviewUpdated_cursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterviewUpdated",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _InterviewUpdated_eventType(ctx context.Context, field graphql.CollectedField, obj *model.InterviewUpdated) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10799,7 +10841,7 @@ func (ec *executionContext) _Subscription_interviewUpdated(ctx context.Context, 
 		ec.fieldContext_Subscription_interviewUpdated,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Subscription().InterviewUpdated(ctx, fc.Args["interviewId"].(uuid.UUID))
+			return ec.resolvers.Subscription().InterviewUpdated(ctx, fc.Args["interviewId"].(uuid.UUID), fc.Args["after"].(*string))
 		},
 		nil,
 		ec.marshalNInterviewUpdated2ᚖgithubᚗcomᚋmasterfabricᚑgoᚋmasterfabricᚋgraphᚋmodelᚐInterviewUpdated,
@@ -10818,6 +10860,8 @@ func (ec *executionContext) fieldContext_Subscription_interviewUpdated(ctx conte
 			switch field.Name {
 			case "interviewId":
 				return ec.fieldContext_InterviewUpdated_interviewId(ctx, field)
+			case "cursor":
+				return ec.fieldContext_InterviewUpdated_cursor(ctx, field)
 			case "eventType":
 				return ec.fieldContext_InterviewUpdated_eventType(ctx, field)
 			case "status":
@@ -14507,6 +14551,11 @@ func (ec *executionContext) _InterviewUpdated(ctx context.Context, sel ast.Selec
 			out.Values[i] = graphql.MarshalString("InterviewUpdated")
 		case "interviewId":
 			out.Values[i] = ec._InterviewUpdated_interviewId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cursor":
+			out.Values[i] = ec._InterviewUpdated_cursor(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

@@ -1,0 +1,9 @@
+fastapi>=0.115
+peft>=0.14
+pydantic>=2.9
+torch>=2.4
+transformers>=4.51
+bitsandbytes>=0.45
+uvicorn[standard]>=0.30
+gradio>=5.0
+spaces>=0.35

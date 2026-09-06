@@ -1,6 +1,9 @@
 package model
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -77,8 +80,46 @@ type Result struct {
 	Signature    string        `json:"signature"`
 }
 
+// SigningPayload returns the canonical, signature-free representation that a
+// trusted runner must sign. Keeping this in the domain model prevents the
+// client and runner from silently verifying different byte sequences.
+func (r Result) SigningPayload() ([]byte, error) {
+	payload := struct {
+		ExecutionID  uuid.UUID     `json:"execution_id"`
+		Status       Status        `json:"status"`
+		ExitCode     int           `json:"exit_code"`
+		Stdout       string        `json:"stdout,omitempty"`
+		Stderr       string        `json:"stderr,omitempty"`
+		Duration     time.Duration `json:"duration"`
+		ResultDigest string        `json:"result_digest"`
+		RunnerID     string        `json:"runner_id"`
+		KeyID        string        `json:"key_id"`
+	}{r.ExecutionID, r.Status, r.ExitCode, r.Stdout, r.Stderr, r.Duration, r.ResultDigest, r.RunnerID, r.KeyID}
+	return json.Marshal(payload)
+}
+
+// ExpectedDigest binds the result digest to the complete signed result
+// payload. It is intentionally deterministic and contains no signature.
+func (r Result) ExpectedDigest() (string, error) {
+	payload, err := json.Marshal(struct {
+		ExecutionID uuid.UUID     `json:"execution_id"`
+		Status      Status        `json:"status"`
+		ExitCode    int           `json:"exit_code"`
+		Stdout      string        `json:"stdout,omitempty"`
+		Stderr      string        `json:"stderr,omitempty"`
+		Duration    time.Duration `json:"duration"`
+		RunnerID    string        `json:"runner_id"`
+		KeyID       string        `json:"key_id"`
+	}{r.ExecutionID, r.Status, r.ExitCode, r.Stdout, r.Stderr, r.Duration, r.RunnerID, r.KeyID})
+	if err != nil {
+		return "", err
+	}
+	hash := sha256.Sum256(payload)
+	return "sha256:" + hex.EncodeToString(hash[:]), nil
+}
+
 func (r Result) Validate() error {
-	if r.ExecutionID == uuid.Nil || strings.TrimSpace(r.RunnerID) == "" || strings.TrimSpace(r.KeyID) == "" || strings.TrimSpace(r.Signature) == "" {
+	if r.ExecutionID == uuid.Nil || strings.TrimSpace(r.RunnerID) == "" || strings.TrimSpace(r.KeyID) == "" || strings.TrimSpace(r.ResultDigest) == "" || strings.TrimSpace(r.Signature) == "" {
 		return errors.New("sandbox result provenance is incomplete")
 	}
 	switch r.Status {

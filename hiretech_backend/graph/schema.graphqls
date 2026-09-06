@@ -301,6 +301,7 @@ type InterviewConnection {
 
 type InterviewUpdated {
   interviewId: UUID!
+  cursor: String!
   eventType: String!
   status: String!
   version: Int!
@@ -507,5 +508,5 @@ type Mutation {
 }
 
 type Subscription {
-  interviewUpdated(interviewId: UUID!): InterviewUpdated!
+  interviewUpdated(interviewId: UUID!, after: String): InterviewUpdated!
 }

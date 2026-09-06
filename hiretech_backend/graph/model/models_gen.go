@@ -248,6 +248,7 @@ type InterviewInvitationPayload struct {
 
 type InterviewUpdated struct {
 	InterviewID uuid.UUID `json:"interviewId"`
+	Cursor      string    `json:"cursor"`
 	EventType   string    `json:"eventType"`
 	Status      string    `json:"status"`
 	Version     int       `json:"version"`

@@ -23,11 +23,12 @@ WORKDIR /app
 COPY --from=builder /bin/masterfabric /app/masterfabric
 COPY --from=builder /app/internal/infrastructure/postgres/migrations /app/migrations
 COPY deployments/migrate.sh /app/migrate.sh
+COPY deployments/start.sh /app/start.sh
 
-RUN chmod +x /app/migrate.sh && chown -R appuser:appgroup /app
+RUN chmod +x /app/migrate.sh /app/start.sh && chown -R appuser:appgroup /app
 
 USER appuser
 
 EXPOSE 8080
 
-ENTRYPOINT ["/app/masterfabric"]
+ENTRYPOINT ["/app/start.sh"]

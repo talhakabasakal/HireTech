@@ -14,7 +14,6 @@ services:
     dockerfilePath: ./hiretech_backend/deployments/Dockerfile
     dockerContext: ./hiretech_backend
     healthCheckPath: /health/live
-    preDeployCommand: /app/migrate.sh
     autoDeployTrigger: commit
     envVars:
       - key: APP_ENV

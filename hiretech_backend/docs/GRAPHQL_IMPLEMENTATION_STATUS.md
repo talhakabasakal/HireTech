@@ -174,6 +174,11 @@ Required validation commands:
   execution in this workspace is blocked by Docker host-port forwarding;
   rerun `npm run test:e2e:backend` after the backend is reachable on
   `127.0.0.1:8080` and Mailpit on `127.0.0.1:8025`.
+- A bounded AI benchmark runner verifies the frozen interviewer/evaluator test
+  split hashes and validates model responses against the role-specific JSON
+  Schema. It records only contract, prohibited-decision, latency, and token
+  evidence; real model quality/latency execution is still blocked until an
+  authorized endpoint and expert-reviewed scoring set are available.
 
 ## Model-serving prerequisite and next phase
 

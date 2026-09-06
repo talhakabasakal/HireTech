@@ -1,4 +1,4 @@
-.PHONY: build run test test-integration test-integration-postgres test-integration-redis test-integration-kafka lint migrate migrate-down docker-up docker-down clean help
+.PHONY: build run test test-integration test-integration-postgres test-integration-redis test-integration-kafka test-ai-benchmark-validate lint migrate migrate-down docker-up docker-down clean help
 
 APP_NAME := masterfabric
 BUILD_DIR := bin
@@ -45,6 +45,11 @@ test-integration-redis:
 test-integration-kafka:
 	@test -n "$(KAFKA_TEST_BROKER)" || (echo "KAFKA_TEST_BROKER is required; refusing to report a skipped integration test as success" >&2; exit 1)
 	KAFKA_TEST_BROKER="$(KAFKA_TEST_BROKER)" go test -count=1 ./internal/infrastructure/kafka -run '^TestKafkaRealtimeFanoutIntegration$$'
+
+## test-ai-benchmark-validate: Verify frozen AI interviewer and evaluator test split manifests
+test-ai-benchmark-validate:
+	python3 ai/benchmarks/run_benchmark.py --role interviewer --dataset ai/training/data/curated/interviewer/test.jsonl --validate-only
+	python3 ai/benchmarks/run_benchmark.py --role evaluator --dataset ai/training/data/curated/evaluator/test.jsonl --validate-only
 
 ## test-cover: Run tests with coverage
 test-cover:

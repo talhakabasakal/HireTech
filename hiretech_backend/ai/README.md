@@ -10,6 +10,7 @@ This directory contains planning contracts for HireTech's future interviewer and
 - `contracts/synthetic-dataset.schema.json`: format for generated, non-candidate benchmark records.
 - `contracts/model-registry.schema.json`: metadata contract for approved models and provider constraints; only secret references are permitted.
 - `BASELINE_EVALUATION_METRICS.md`: offline and pre-production quality, safety, reliability, latency, and cost gates.
+- `benchmarks/`: bounded endpoint runner for frozen test splits; it measures contract and latency evidence but cannot grant release approval.
 - `LLM_ROUTING_REQUIREMENTS.md`: server-side routing, role separation, fallback, data-governance, and observability requirements.
 - `training/README.md`: offline dataset curation, contract validation, and role-specific QLoRA training flow.
 
@@ -50,3 +51,12 @@ Before runtime integration, CI must:
 5. Verify that rubric weights sum to one for every profile.
 6. Scan this directory for secrets and likely real personal data.
 
+## Benchmark execution
+
+The benchmark runner verifies the curated test file hash against
+`training/data/curated/manifest.json` before calling a model. It requires an
+explicit endpoint and model for execution and fails closed when the endpoint,
+dataset hash, contract, or response is invalid. See `benchmarks/README.md` for
+the validate-only and endpoint commands. No benchmark result is recorded here
+until a reachable model endpoint is available; expert quality and model-risk
+review remain separate promotion gates.

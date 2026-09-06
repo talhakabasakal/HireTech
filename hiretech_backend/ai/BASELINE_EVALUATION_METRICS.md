@@ -6,6 +6,12 @@ These are pre-production gates for selecting and configuring interviewer, evalua
 
 Fine-tuning is outside this phase. Baselines compare off-the-shelf models and prompt/router configurations only.
 
+The bounded execution path is `benchmarks/run_benchmark.py`. It verifies the
+frozen test split hash, uses deterministic decoding, records contract/latency/token
+evidence, and fails closed on invalid inputs or responses. Run it only against an
+explicitly authorized reachable endpoint. Its report does not replace blinded
+expert scoring, security testing, privacy review, or release approval.
+
 ## 2. Dataset policy
 
 - Use only synthetic records that validate against `contracts/synthetic-dataset.schema.json`.
@@ -105,5 +111,9 @@ Metrics must use synthetic/pseudonymous identifiers and must not include prompt,
 7. Require technical, security, privacy, and model-risk approval.
 8. Activate through a staged rollout with automatic rollback thresholds.
 
-Never promote a model solely because it is faster or cheaper. Hard security, privacy, evidence, and human-review gates take precedence.
+The runner's automated report is an input to steps 2–5, not evidence that steps 6–8
+have been approved. Until real role-specific endpoints and an expert-reviewed
+benchmark set are available, the AI quality/latency gate remains open and no
+production model activation is claimed.
 
+Never promote a model solely because it is faster or cheaper. Hard security, privacy, evidence, and human-review gates take precedence.

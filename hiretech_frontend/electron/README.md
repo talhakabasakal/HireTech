@@ -59,7 +59,24 @@ Run electron-builder on the matching operating system (or a matching CI runner)
 for reliable native packaging. `npm run electron:dir` creates an unpacked build
 for local smoke testing.
 
-The build is intentionally unsigned. Configure the relevant electron-builder signing/notarization environment later when certificates and credentials are available.
+The ordinary build is intentionally unsigned. A production build must use the
+guarded release path, which requires explicit owner authorization, a remote
+HTTPS API origin, signing references/passwords from the CI secret store, and the
+platform signing keyring where applicable:
+
+```bash
+ELECTRON_RELEASE_AUTHORIZED=true \
+NEXT_PUBLIC_API_URL=https://api.example.invalid \
+CSC_LINK="$SECRET_STORE_REFERENCE" \
+CSC_KEY_PASSWORD="$SECRET_STORE_PASSWORD" \
+ELECTRON_LINUX_SIGNING_KEYRING=configured \
+npm run electron:dist:release
+```
+
+Use platform-native CI runners and the platform-specific electron-builder
+certificate variables. The preflight never prints secret values and never
+publishes an artifact. Without release authority and certificates, signing and
+production release remain intentionally blocked.
 
 ## Bridge and security
 

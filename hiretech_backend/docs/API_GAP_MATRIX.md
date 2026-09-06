@@ -155,6 +155,12 @@ Verified PostgreSQL lifecycle and Redis rate-limit integration gate
 Code execution remains a separately reviewed sandbox track. Fine-tuning is
 explicitly outside this plan.
 
+The bounded AI benchmark runner now verifies frozen curated test hashes and can
+measure contract validity, prohibited-decision output, latency, and token usage
+against an explicitly supplied OpenAI-compatible endpoint. Real model results,
+expert quality labels, and promotion approval remain pending because this
+workspace has no authorized production model endpoint or model-risk sign-off.
+
 ## 10. Highest-priority acceptance tests
 
 1. A forged `X-Organization-ID` cannot affect any GraphQL query, mutation, subscription, cache key, audit tenant, or repository predicate.

@@ -29,6 +29,8 @@
     "electron:dist:win": "npm run electron:dist -- --win",
     "electron:dist:mac": "npm run electron:dist -- --mac",
     "electron:dist:linux": "npm run electron:dist -- --linux",
+    "electron:release:preflight": "node scripts/electron-release-preflight.mjs --require-signing",
+    "electron:dist:release": "npm run electron:release:preflight && npm run electron:dist",
     "preelectron:dir": "node electron/write-runtime-config.cjs",
     "electron:dir": "npm run build:web && electron-builder --dir"
   },

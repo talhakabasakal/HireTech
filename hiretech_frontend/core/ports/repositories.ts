@@ -79,6 +79,7 @@ export interface PublishAdminRubricInput { name: string; criteria: Array<{ name:
 
 export interface AdminRepository {
   getWorkspace(): Promise<AdminWorkspace>;
+  getAuditEvents(): Promise<AdminWorkspace["auditEvents"]>;
   registerModel(input: RegisterAdminModelInput): Promise<AdminWorkspace["models"][number]>;
   createPromptVersion(input: CreateAdminPromptVersionInput): Promise<AdminWorkspace["prompts"][number]>;
   updateRouting(input: UpdateAdminRoutingInput): Promise<AdminWorkspace["routing"][number]>;

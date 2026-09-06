@@ -1,4 +1,4 @@
-import { AddInterviewQuestion, ApproveInterviewQuestionDraft, CancelInterview, CreateAdminPromptVersion, CreateInterview, CreateInterviewInvitation, GetAdminWorkspace, GetCandidateWorkspace, GetDevices, GetEvaluationReport, GetInterviewQuestionDraft, GetInterviewWorkspace, GetRecruiterInterview, GetRecruiterWorkspace, PublishAdminRubric, PublishInterview, RedeemCandidateInvitation, RegisterAdminModel, RejectInterviewQuestionDraft, RequestEvaluation, RequestInterviewQuestionDraft, RevokeDevice, SaveCandidateAnswer, SubmitCandidateFeedback, SubmitHumanReview, UpdateAdminRouting } from "@/core/application/workspaces";
+import { AddInterviewQuestion, ApproveInterviewQuestionDraft, CancelInterview, CreateAdminPromptVersion, CreateInterview, CreateInterviewInvitation, GetAdminAuditEvents, GetAdminWorkspace, GetCandidateWorkspace, GetDevices, GetEvaluationReport, GetInterviewQuestionDraft, GetInterviewWorkspace, GetRecruiterInterview, GetRecruiterWorkspace, PublishAdminRubric, PublishInterview, RedeemCandidateInvitation, RegisterAdminModel, RejectInterviewQuestionDraft, RequestEvaluation, RequestInterviewQuestionDraft, RevokeDevice, SaveCandidateAnswer, SubmitCandidateFeedback, SubmitHumanReview, UpdateAdminRouting } from "@/core/application/workspaces";
 import { Login, RecoverExpiredSession, Register, RequestOtp, RequestPasswordReset, ResetPassword, VerifyOtp } from "@/core/application/auth";
 import { ApiAuthRepository, ApiDeviceRepository } from "@/core/infrastructure/api/auth-repositories";
 import { ApiRecruiterRepository } from "@/core/infrastructure/graphql/recruiter-repository";
@@ -48,6 +48,6 @@ export const dependencies = {
     getReport: new GetEvaluationReport(recruiterRepository),
     submitHumanReview: new SubmitHumanReview(recruiterRepository),
   },
-  admin: { getWorkspace: new GetAdminWorkspace(adminRepository), registerModel: new RegisterAdminModel(adminRepository), createPromptVersion: new CreateAdminPromptVersion(adminRepository), updateRouting: new UpdateAdminRouting(adminRepository), publishRubric: new PublishAdminRubric(adminRepository) },
+  admin: { getWorkspace: new GetAdminWorkspace(adminRepository), getAuditEvents: new GetAdminAuditEvents(adminRepository), registerModel: new RegisterAdminModel(adminRepository), createPromptVersion: new CreateAdminPromptVersion(adminRepository), updateRouting: new UpdateAdminRouting(adminRepository), publishRubric: new PublishAdminRubric(adminRepository) },
   devices: { getDevices: new GetDevices(deviceRepository), revokeDevice: new RevokeDevice(deviceRepository) },
 } as const;

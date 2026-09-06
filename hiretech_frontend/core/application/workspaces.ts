@@ -102,6 +102,10 @@ export class GetAdminWorkspace {
   constructor(private readonly repository: AdminRepository) {}
   execute() { return this.repository.getWorkspace(); }
 }
+export class GetAdminAuditEvents {
+  constructor(private readonly repository: AdminRepository) {}
+  execute() { return this.repository.getAuditEvents(); }
+}
 export class RegisterAdminModel { constructor(private readonly repository: AdminRepository) {} execute(input: RegisterAdminModelInput) { return this.repository.registerModel(input); } }
 export class CreateAdminPromptVersion { constructor(private readonly repository: AdminRepository) {} execute(input: CreateAdminPromptVersionInput) { return this.repository.createPromptVersion(input); } }
 export class UpdateAdminRouting { constructor(private readonly repository: AdminRepository) {} execute(input: UpdateAdminRoutingInput) { return this.repository.updateRouting(input); } }

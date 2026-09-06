@@ -255,6 +255,7 @@ export class MockAdminRepository implements AdminRepository {
   }
   private persist() { writeMockState("admin", this.workspace); }
   async getWorkspace() { await wait(); this.hydrate(); return clone(this.workspace); }
+  async getAuditEvents() { await wait(); this.hydrate(); return clone(this.workspace.auditEvents); }
   async registerModel(input: Parameters<AdminRepository["registerModel"]>[0]) { await wait(); this.hydrate(); const item = { id: `model_${Date.now()}`, ...input }; this.workspace.models.push(item); this.persist(); return clone(item); }
   async createPromptVersion(input: Parameters<AdminRepository["createPromptVersion"]>[0]) { await wait(); this.hydrate(); const item = { id: `prompt_${Date.now()}`, ...input, version: 2, status: "draft" as const, updatedAt: new Date().toISOString(), updatedBy: "demo-admin" }; this.workspace.prompts.unshift(item); this.persist(); return clone(item); }
   async updateRouting(input: Parameters<AdminRepository["updateRouting"]>[0]) { await wait(); this.hydrate(); const existing = this.workspace.routing.find((item) => item.role === input.role); const item = { id: existing?.id ?? `routing_${Date.now()}`, ...input }; if (existing) Object.assign(existing, item); else this.workspace.routing.push(item); this.persist(); return clone(item); }

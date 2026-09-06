@@ -5,13 +5,17 @@ import { dependencies } from "@/core/config/dependencies";
 import { getErrorMessage } from "@/core/errors/application-error";
 import type { AdminViewState } from "@/features/admin/model/admin.types";
 
-export function useAdminViewModel() {
+export function useAdminViewModel(includeAuditEvents = false) {
   const [state, setState] = useState<AdminViewState>({ status: "loading", workspace: null, message: null });
   const load = useCallback(async () => {
     setState((current) => ({ ...current, status: "loading", message: null }));
-    try { const workspace = await dependencies.admin.getWorkspace.execute(); setState({ status: "success", workspace, message: null }); }
+    try {
+      const workspace = await dependencies.admin.getWorkspace.execute();
+      const auditEvents = includeAuditEvents ? await dependencies.admin.getAuditEvents.execute() : workspace.auditEvents;
+      setState({ status: "success", workspace: { ...workspace, auditEvents }, message: null });
+    }
     catch (error) { setState((current) => ({ ...current, status: "error", message: getErrorMessage(error) })); }
-  }, []);
+  }, [includeAuditEvents]);
   const refresh = useCallback(async () => { await load(); }, [load]);
   const registerModel = useCallback(async (input: Parameters<typeof dependencies.admin.registerModel.execute>[0]) => { await dependencies.admin.registerModel.execute(input); await refresh(); }, [refresh]);
   const createPromptVersion = useCallback(async (input: Parameters<typeof dependencies.admin.createPromptVersion.execute>[0]) => { await dependencies.admin.createPromptVersion.execute(input); await refresh(); }, [refresh]);

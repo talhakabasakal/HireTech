@@ -157,7 +157,7 @@ Required validation commands:
   silently degrading to an in-process bus when enabled Kafka is unavailable.
   Persisted-operation hash allowlisting is implemented behind
   `GRAPHQL_REQUIRE_PERSISTED_OPERATIONS`. The frontend now versions a
-  deterministic 27-operation manifest and checks it during production builds;
+  deterministic 28-operation manifest and checks it during production builds;
   its release command renders `GRAPHQL_ALLOWED_OPERATION_HASHES` without manual
   transcription. Production startup fails closed when the gate is enabled
   without valid hashes. Activating both frontend and backend flags remains an

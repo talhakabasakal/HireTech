@@ -10,11 +10,18 @@
       "query": "mutation AddQuestion($input: CreateQuestionInput!) { addQuestion(input: $input) { id interviewId sequence type prompt competencyIds difficulty timeLimitSeconds createdAt } }"
     },
     {
+      "name": "AdminAuditEvents",
+      "type": "query",
+      "sha256Hash": "7f8f27255bdbde7acd3fe7cdcf54e341c297f741e43a50d029241b3e927e81fa",
+      "source": "core/infrastructure/graphql/admin-repository.ts",
+      "query": "query AdminAuditEvents($first: Int!) { adminAuditEvents(first: $first) { edges { node { id action actor target result occurredAt } } } }"
+    },
+    {
       "name": "AdminWorkspace",
       "type": "query",
-      "sha256Hash": "ff7bcc1083b15db6255a37a665b986e9d8cda21ce28f09223e98e8726979ad40",
+      "sha256Hash": "108a4ff85568c3d14196a17ebb6ed4f8b7dbfefa8933aedd87b7b4dee2f38a4d",
       "source": "core/infrastructure/graphql/admin-repository.ts",
-      "query": "query AdminWorkspace { adminWorkspace { models { id modelId displayName providerLabel roles status latencyClass } prompts { id role name version promptTemplate status updatedAt updatedBy } rubric { id name version criteria { name weight } status updatedAt updatedBy } routing { id role primaryModelId fallbackModelId timeoutSeconds enabled updatedAt updatedBy } versions { id resource version action actor createdAt } auditEvents { id action actor target result occurredAt } } }"
+      "query": "query AdminWorkspace { adminWorkspace { models { id modelId displayName providerLabel roles status latencyClass } prompts { id role name version promptTemplate status updatedAt updatedBy } rubric { id name version criteria { name weight } status updatedAt updatedBy } routing { id role primaryModelId fallbackModelId timeoutSeconds enabled updatedAt updatedBy } versions { id resource version action actor createdAt } } }"
     },
     {
       "name": "ApproveQuestionDraft",

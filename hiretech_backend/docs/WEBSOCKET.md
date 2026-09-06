@@ -57,11 +57,13 @@ only lifecycle metadata; answer text, code, prompts, tokens, and provider
 payloads are never broadcast. Tenant-selection headers are rejected and the
 browser `Origin` must match `CORS_ALLOWED_ORIGINS` explicitly.
 
-The in-process broker caps active streams at `WS_MAX_CONNECTIONS` and uses a
-small bounded per-stream buffer. A full buffer drops the advisory update and
-logs the condition; the database lifecycle state remains authoritative. There
-is currently no durable replay cursor or cross-instance fan-out, so clients
-must refetch current state after reconnect.
+The broker caps active streams at `WS_MAX_CONNECTIONS` and uses a small bounded
+per-stream buffer. A full buffer drops the advisory update and logs the
+condition; the database lifecycle state remains authoritative. When Kafka is
+enabled, each API instance consumes with its own group suffix, so the same
+lifecycle event reaches every replica's local sockets. Clients must still
+refetch current state after reconnect because a durable replay cursor is not
+implemented yet.
 
 ## Design principles
 

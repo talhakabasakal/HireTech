@@ -15,15 +15,16 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/masterfabric ./cmd/server
 # Runtime stage
 FROM alpine:3.24
 
-RUN apk add --no-cache ca-certificates tzdata \
+RUN apk add --no-cache ca-certificates tzdata postgresql-client \
     && addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
 
 COPY --from=builder /bin/masterfabric /app/masterfabric
 COPY --from=builder /app/internal/infrastructure/postgres/migrations /app/migrations
+COPY deployments/migrate.sh /app/migrate.sh
 
-RUN chown -R appuser:appgroup /app
+RUN chmod +x /app/migrate.sh && chown -R appuser:appgroup /app
 
 USER appuser
 

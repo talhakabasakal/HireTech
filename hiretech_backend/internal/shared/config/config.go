@@ -269,6 +269,30 @@ func Load() *Config {
 	if err != nil || strings.TrimSpace(hostname) == "" {
 		hostname = "local"
 	}
+	database := DatabaseConfig{
+		Host:     envOrDefault("DB_HOST", "localhost"),
+		Port:     envOrDefaultInt("DB_PORT", 5432),
+		User:     envOrDefault("DB_USER", "masterfabric"),
+		Password: envOrDefault("DB_PASSWORD", "masterfabric"),
+		DBName:   envOrDefault("DB_NAME", "masterfabric"),
+		SSLMode:  envOrDefault("DB_SSLMODE", "disable"),
+		MaxConns: envOrDefaultInt32("DB_MAX_CONNS", 25),
+		MinConns: envOrDefaultInt32("DB_MIN_CONNS", 5),
+	}
+	if raw := os.Getenv("DATABASE_URL"); strings.TrimSpace(raw) != "" {
+		database = databaseConfigFromURL(raw, database)
+	}
+
+	redisConfig := RedisConfig{
+		Host:     envOrDefault("REDIS_HOST", "localhost"),
+		Port:     envOrDefaultInt("REDIS_PORT", 6379),
+		Password: envOrDefault("REDIS_PASSWORD", ""),
+		DB:       envOrDefaultInt("REDIS_DB", 0),
+	}
+	if raw := os.Getenv("REDIS_URL"); strings.TrimSpace(raw) != "" {
+		redisConfig = redisConfigFromURL(raw, redisConfig)
+	}
+
 	return &Config{
 		Environment: envOrDefault("APP_ENV", EnvironmentDevelopment),
 		Server: ServerConfig{
@@ -280,22 +304,8 @@ func Load() *Config {
 			CORSAllowedOrigins: envOrDefaultSlice("CORS_ALLOWED_ORIGINS", nil),
 			MaxBodyBytes:       envOrDefaultInt64("MAX_BODY_BYTES", 1<<20),
 		},
-		Database: DatabaseConfig{
-			Host:     envOrDefault("DB_HOST", "localhost"),
-			Port:     envOrDefaultInt("DB_PORT", 5432),
-			User:     envOrDefault("DB_USER", "masterfabric"),
-			Password: envOrDefault("DB_PASSWORD", "masterfabric"),
-			DBName:   envOrDefault("DB_NAME", "masterfabric"),
-			SSLMode:  envOrDefault("DB_SSLMODE", "disable"),
-			MaxConns: envOrDefaultInt32("DB_MAX_CONNS", 25),
-			MinConns: envOrDefaultInt32("DB_MIN_CONNS", 5),
-		},
-		Redis: RedisConfig{
-			Host:     envOrDefault("REDIS_HOST", "localhost"),
-			Port:     envOrDefaultInt("REDIS_PORT", 6379),
-			Password: envOrDefault("REDIS_PASSWORD", ""),
-			DB:       envOrDefaultInt("REDIS_DB", 0),
-		},
+		Database: database,
+		Redis:    redisConfig,
 		JWT: JWTConfig{
 			Secret:             envOrDefault("JWT_SECRET", defaultJWTSecret),
 			Keys:               parseKeyRing(os.Getenv("JWT_KEYS")),
@@ -383,6 +393,66 @@ func Load() *Config {
 			},
 		},
 	}
+}
+
+func databaseConfigFromURL(raw string, fallback DatabaseConfig) DatabaseConfig {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Hostname() == "" {
+		return fallback
+	}
+
+	result := fallback
+	result.Host = parsed.Hostname()
+	if port := parsed.Port(); port != "" {
+		if parsedPort, parseErr := strconv.Atoi(port); parseErr == nil {
+			result.Port = parsedPort
+		}
+	}
+	if parsed.User != nil {
+		result.User = parsed.User.Username()
+		if password, ok := parsed.User.Password(); ok {
+			result.Password = password
+		}
+	}
+	result.DBName = strings.TrimPrefix(parsed.Path, "/")
+	if result.DBName == "" {
+		result.DBName = fallback.DBName
+	}
+	if sslMode := parsed.Query().Get("sslmode"); sslMode != "" {
+		result.SSLMode = sslMode
+	}
+	return result
+}
+
+func redisConfigFromURL(raw string, fallback RedisConfig) RedisConfig {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Hostname() == "" {
+		return fallback
+	}
+
+	result := fallback
+	result.Host = parsed.Hostname()
+	if port := parsed.Port(); port != "" {
+		if parsedPort, parseErr := strconv.Atoi(port); parseErr == nil {
+			result.Port = parsedPort
+		}
+	}
+	if parsed.User != nil {
+		if password, ok := parsed.User.Password(); ok {
+			result.Password = password
+		}
+	}
+	if dbName := strings.TrimPrefix(parsed.Path, "/"); dbName != "" {
+		if db, parseErr := strconv.Atoi(dbName); parseErr == nil {
+			result.DB = db
+		}
+	}
+	if db := parsed.Query().Get("db"); db != "" {
+		if parsedDB, parseErr := strconv.Atoi(db); parseErr == nil {
+			result.DB = parsedDB
+		}
+	}
+	return result
 }
 
 func parseKeyRing(raw string) map[string]string {

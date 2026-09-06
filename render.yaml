@@ -1,0 +1,71 @@
+services:
+  - type: keyvalue
+    name: hiretech-redis
+    region: frankfurt
+    plan: free
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
+  - type: web
+    name: hiretech-api
+    runtime: docker
+    region: frankfurt
+    plan: free
+    dockerfilePath: ./hiretech_backend/deployments/Dockerfile
+    dockerContext: ./hiretech_backend
+    healthCheckPath: /health/live
+    preDeployCommand: /app/migrate.sh
+    autoDeployTrigger: commit
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: SERVER_HOST
+        value: 0.0.0.0
+      - key: SERVER_PORT
+        value: "8080"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hiretech-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: hiretech-redis
+          type: keyvalue
+          property: connectionString
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://hire-tech-tau.vercel.app
+      - key: AI_ENABLED
+        value: "false"
+      - key: KAFKA_ENABLED
+        value: "false"
+      - key: JWT_ALGORITHM
+        value: RS256
+      - key: JWT_ACTIVE_KID
+        value: primary
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_PRIVATE_KEY_PEM
+        sync: false
+      - key: JWT_PUBLIC_KEYS
+        sync: false
+      - key: EMAIL_PROVIDER
+        value: smtp
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_TLS_MODE
+        value: starttls
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+
+databases:
+  - name: hiretech-db
+    region: frankfurt
+    plan: free
+    databaseName: hiretech
+    user: hiretech

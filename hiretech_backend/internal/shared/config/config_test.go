@@ -156,6 +156,25 @@ func TestLoad_EnvironmentOverrides(t *testing.T) {
 	assert.Equal(t, "starttls", cfg.Email.TLSMode)
 }
 
+func TestLoad_RenderConnectionURLs(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgresql://render-user:p%40ss@db.internal:5433/hiretech?sslmode=require")
+	t.Setenv("REDIS_URL", "redis://:redis%40pass@redis.internal:6380/2")
+
+	cfg := Load()
+
+	assert.Equal(t, DatabaseConfig{
+		Host:     "db.internal",
+		Port:     5433,
+		User:     "render-user",
+		Password: "p@ss",
+		DBName:   "hiretech",
+		SSLMode:  "require",
+		MaxConns: 25,
+		MinConns: 5,
+	}, cfg.Database)
+	assert.Equal(t, RedisConfig{Host: "redis.internal", Port: 6380, Password: "redis@pass", DB: 2}, cfg.Redis)
+}
+
 func TestLoad_DBPoolInt32Bounds(t *testing.T) {
 	os.Setenv("DB_MAX_CONNS", "50")
 	os.Setenv("DB_MIN_CONNS", "2147483648")

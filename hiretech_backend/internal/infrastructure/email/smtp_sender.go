@@ -25,6 +25,8 @@ func NewSender(cfg config.EmailConfig) (iamService.EmailSender, error) {
 		return NoopSender{}, nil
 	case "smtp":
 		return NewSMTPSender(cfg)
+	case "resend":
+		return NewResendSender(cfg)
 	default:
 		return nil, fmt.Errorf("unsupported email provider %q", cfg.Provider)
 	}

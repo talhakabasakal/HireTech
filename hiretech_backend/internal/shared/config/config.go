@@ -90,7 +90,7 @@ func (c *Config) ValidateForProduction() error {
 	return nil
 }
 
-// EmailConfig controls transactional OTP delivery. Provider may be noop or smtp.
+// EmailConfig controls transactional OTP delivery. Provider may be noop, smtp, or resend.
 type EmailConfig struct {
 	Provider   string
 	SMTPHost   string
@@ -100,6 +100,8 @@ type EmailConfig struct {
 	From       string
 	TLSMode    string
 	TimeoutSec int
+	APIKey     string
+	APIURL     string
 }
 
 // WebSocketConfig holds real-time WebSocket settings.
@@ -337,6 +339,8 @@ func Load() *Config {
 			From:       envOrDefault("EMAIL_FROM", "HireTech <noreply@hiretech.com>"),
 			TLSMode:    strings.ToLower(envOrDefault("SMTP_TLS_MODE", "none")),
 			TimeoutSec: envOrDefaultInt("SMTP_TIMEOUT_SECONDS", 10),
+			APIKey:     envOrDefault("RESEND_API_KEY", ""),
+			APIURL:     envOrDefault("RESEND_API_URL", "https://api.resend.com/emails"),
 		},
 		Kafka: KafkaConfig{
 			Brokers:           envOrDefaultSlice("KAFKA_BROKERS", []string{"localhost:9092"}),

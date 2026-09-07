@@ -33,6 +33,22 @@ The `HIRETECH_*` variables are translated by `dev.sh` into the application's
 SMTP configuration. They are intentionally not stored in `.env`, source code,
 or git.
 
+## Resend HTTPS API
+
+Render Free web services cannot open outbound SMTP connections. Use the Resend
+HTTPS API instead by setting the provider and API key in the backend environment:
+
+```bash
+EMAIL_PROVIDER=resend
+RESEND_API_URL=https://api.resend.com/emails
+RESEND_API_KEY=re_your_api_key
+EMAIL_FROM="HireTech <onboarding@resend.dev>"
+```
+
+For production recipients, verify a sending domain in Resend and set
+`EMAIL_FROM` to an address on that domain. The `onboarding@resend.dev` sender is
+intended for initial testing with the Resend account email.
+
 ## Other providers
 
 For Outlook, Amazon SES, SendGrid, Mailgun, or another SMTP provider, use that

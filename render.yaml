@@ -48,7 +48,11 @@ services:
       - key: JWT_PUBLIC_KEYS
         sync: false
       - key: EMAIL_PROVIDER
-        value: smtp
+        value: resend
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_API_URL
+        value: https://api.resend.com/emails
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
